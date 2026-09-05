@@ -23,13 +23,12 @@ import db_driver  # noqa: E402
 import instance_state  # noqa: E402
 import mem  # noqa: E402
 
-DB_PATH = instance_state.active_database_path(ENGINE)
-
 
 def _open_db():
-    if not DB_PATH.exists():
-        raise SystemExit(f"models: no DB at {DB_PATH} — run `sc rebuild`")
-    return db_driver.connect(DB_PATH)
+    db_path = instance_state.active_database_path(ENGINE)
+    if not db_path.exists():
+        raise SystemExit(f"models: no DB at {db_path} — run `sc rebuild`")
+    return db_driver.connect(db_path)
 
 
 def _shell_api_enabled() -> bool:
@@ -57,6 +56,15 @@ def _api_routes(*, harness: str | None = None,
     return _api_route_projection(harness=harness, selector=selector).get(
         "routes"
     ) or []
+
+
+def _refresh(payload: dict) -> int:
+    print("models: " + (
+        "stale — " + payload.get("error", "refresh failed")
+        if payload.get("stale")
+        else "refreshed from " + ", ".join(payload.get("sources") or [])
+    ))
+    return 2 if payload.get("stale") else 0
 
 
 def _route(con, harness: str, selector: str):
@@ -274,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
               "[--shell <shortname>] [--json]")
         return 0
     command = args[0]
+    if command == "refresh" and _shell_api_enabled():
+        return _refresh(mem._api("GET", "/api/models?refresh=1"))
     if command == "list" and _shell_api_enabled():
         return _print_routes(_api_routes(
             harness=args[1] if len(args) > 1 else None
@@ -305,11 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     con = _open_db()
     try:
         if args[0] == "refresh":
-            payload = model_catalog.catalog(refresh=True, con=con)
-            print("models: " + ("stale — " + payload.get("error", "refresh failed")
-                                if payload.get("stale") else
-                                "refreshed from " + ", ".join(payload.get("sources") or [])))
-            return 2 if payload.get("stale") else 0
+            return _refresh(model_catalog.catalog(refresh=True, con=con))
         if args[0] == "list":
             return _list(con, args[1] if len(args) > 1 else None)
         if args[0] != "resolve":

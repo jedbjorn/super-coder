@@ -18,6 +18,7 @@ Run:
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import io
 import json
 import sqlite3
@@ -1230,6 +1231,21 @@ class RouteCliConnectionTest(unittest.TestCase):
         "adapter_metadata": "{}",
     }
 
+    def test_import_does_not_resolve_private_database(self):
+        spec = importlib.util.spec_from_file_location(
+            "models_import_probe",
+            ROOT / ".super-coder" / "scripts" / "models.py",
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+
+        with mock.patch.object(
+            routes_cli.instance_state,
+            "active_database_path",
+            side_effect=AssertionError("must not resolve private state at import"),
+        ):
+            spec.loader.exec_module(module)
+
     @classmethod
     def controlled_route(cls, harness: str) -> dict:
         versions = {
@@ -1735,11 +1751,31 @@ class RouteCliConnectionTest(unittest.TestCase):
         con = mock.Mock()
         payload = {"stale": False, "sources": ["test-source"]}
         with (
+            mock.patch.object(routes_cli.mem, "SC_API_TOKEN", ""),
             mock.patch.object(routes_cli, "_open_db", return_value=con) as opened,
             mock.patch.object(routes_cli.model_catalog, "catalog", return_value=payload),
         ):
             self.assertEqual(routes_cli.main(["refresh"]), 0)
         opened.assert_called_once_with()
+
+    def test_authenticated_refresh_uses_api_without_opening_database(self):
+        payload = {"stale": False, "sources": ["test-source"]}
+        output = io.StringIO()
+        with (
+            mock.patch.object(routes_cli.mem, "SC_API_TOKEN", "shell-token"),
+            mock.patch.object(routes_cli.mem, "SC_API_BASE", "http://engine"),
+            mock.patch.object(
+                routes_cli.mem, "_api", return_value=payload
+            ) as api,
+            mock.patch.object(
+                routes_cli, "_open_db", side_effect=AssertionError("opened DB")
+            ),
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(routes_cli.main(["refresh"]), 0)
+
+        api.assert_called_once_with("GET", "/api/models?refresh=1")
+        self.assertEqual(output.getvalue(), "models: refreshed from test-source\n")
 
 
 class CatalogCacheTest(NoCLI):
