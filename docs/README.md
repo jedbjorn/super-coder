@@ -338,8 +338,9 @@ it owns:
    re-pushes; the thread closes when it's clean.
    *(dev · ambient DEV TOOLS, `flags`, `git` · UI: Flags)*
 10. **Operator merges** — merging is the FnB's gate: an explicit directive
-    naming the PR, or — inside an armed Sprint — the grant the FnB gave by
-    arming it, checked live by `sc sprint authorize-merge`. On dev's next boot
+    naming the PR (the one exception is the operator's grant recorded when an
+    orchestrated run is armed, which the engine checks live before the shell
+    merges). On dev's next boot
     the launcher auto-syncs the base onto `origin/main` and prunes the merged
     branch. *(operator gate; no shell skill · UI: Worktrees)*
 11. **Freeze spec + write docs** — on ship, the spec freezes (`frozen=1`,
