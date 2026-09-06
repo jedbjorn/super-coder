@@ -2455,7 +2455,7 @@ WHERE flavor IN ('admin', 'planner', 'dev', 'reviewer', 'devops', 'cartographer'
   AND skill_id IN (
   SELECT skill_id FROM skills WHERE name IN (
     'admin_git', 'bootstrap', 'cartographer', 'curate', 'db_map',
-    'dev_kit', 'docs', 'engine_database', 'engine_migrations', 'flag_sweep',
+    'docs', 'engine_database', 'engine_migrations', 'flag_sweep',
     'flags', 'fork_skill_design', 'git', 'git_cleanup', 'harness_readiness',
     'issue_reporting', 'memory', 'messaging', 'onboard', 'redline_review',
     'review', 'self_update', 'snapshot', 'spec', 'sprint_close',
