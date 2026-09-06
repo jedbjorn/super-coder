@@ -12,9 +12,11 @@ shells receive neither. Every shell starts un-bootstrapped (gets the FIRST RUN
 orientation) and has its first session opened.
 
 Fork-local flavor overlays may replace identity text (`role`, `mandate`,
-`focus`, `abbr`) without editing materialized engine templates. Skill
-assignment no longer flows through overlays: the live `flavor_skills` pack is
-the one write surface for every shell of that flavor.
+`focus`, `abbr`) without editing materialized engine templates. The flavor's
+procedure body (`templates/shells/<flavor>.md`) is engine-owned and rendered
+into the prompt through the `{{procedure}}` slot; overlays never touch it.
+Skill assignment no longer flows through overlays: the live `flavor_skills`
+pack is the one write surface for every shell of that flavor.
 """
 from __future__ import annotations
 
@@ -132,10 +134,30 @@ def _auto_shortname(con, abbr: str) -> str:
     return f"{abbr}{hi + 1}"
 
 
-def render_prompt(name: str, role: str, repo: str, focus: str, mandate: str) -> str:
+def load_procedure(flavor: str | None) -> str:
+    """The engine-owned procedure body for a standard flavor.
+
+    `templates/shells/<flavor>.md` is read beside the JSON identity template and
+    is never part of a fork overlay (`_apply_overlay` sees only the JSON), so a
+    fork that replaces `focus` keeps the engine procedure. Bespoke shells have
+    no flavor and no body.
+    """
+    if not flavor:
+        return ""
+    path = SHELL_TEMPLATES / f"{flavor}.md"
+    return path.read_text().strip() if path.exists() else ""
+
+
+def render_prompt(name: str, role: str, repo: str, focus: str, mandate: str,
+                  procedure: str = "") -> str:
     if not PROMPT_TEMPLATE.exists():
-        return f"# {name} — {role} for {repo}\n\n{focus}\n\n## MANDATE\n\n{mandate}\n"
+        body = f"{focus}\n\n{procedure}\n\n" if procedure else f"{focus}\n\n"
+        return f"# {name} — {role} for {repo}\n\n{body}## MANDATE\n\n{mandate}\n"
     text = PROMPT_TEMPLATE.read_text()
+    if procedure:
+        text = text.replace("{{procedure}}", procedure)
+    else:
+        text = text.replace("{{procedure}}\n\n", "")
     for slot, val in (("{{name}}", name), ("{{role}}", role), ("{{repo}}", repo),
                       ("{{focus}}", focus), ("{{mandate}}", mandate)):
         text = text.replace(slot, val)
@@ -162,7 +184,8 @@ def refresh_standard_prompts(con, *, repo: str | None = None) -> int:
         role = row[2] or template["role"]
         mandate = row[3] or template["mandate"].replace("{{repo}}", repo)
         focus = template.get("focus", "").replace("{{repo}}", repo)
-        prompt = render_prompt(row[1], role, repo, focus, mandate)
+        prompt = render_prompt(row[1], role, repo, focus, mandate,
+                               load_procedure(flavor))
         if row[5] == prompt:
             continue
         con.execute(
@@ -208,8 +231,8 @@ def create_shell(con, *, flavor: str | None, name: str,
         "api_key, api_key_rotated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, datetime('now'))",
         (name, shortname, partner, role, mandate,
-         render_prompt(name, role, repo, focus, mandate),
-         f"Created ({flavor or 'Bespoke'}). First session — run the bootstrap skill to orient.",
+         render_prompt(name, role, repo, focus, mandate, load_procedure(flavor)),
+         f"Created ({flavor or 'Bespoke'}). First session — complete FIRST RUN orientation.",
          f"Single repo: this one ({repo}). One shell, one cwd.",
          lineage_seed, flavor, int(seed_identity), user_id, is_shared,
          api_key))
