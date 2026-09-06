@@ -158,14 +158,15 @@ class LnsCurationTest(unittest.TestCase):
             self.q("SELECT LENGTH(body) FROM shell_identity_entries "
                    "WHERE kind='lns'")[0], 500)
 
-    def test_current_state_301_aborts_and_300_writes(self):
-        msg = self.mem_fails("state", "y" * 301)
-        self.assertIn("300 chars", msg)
+    def test_current_state_501_aborts_and_500_writes(self):
+        # 0256: guidance says ~300 and point at rows; the hard stop is 500.
+        msg = self.mem_fails("state", "y" * 501)
+        self.assertIn("500 chars", msg)
         self.assertIn("point at the row", msg)
         self.assertIsNone(self.q("SELECT current_state FROM shells WHERE shell_id=1")[0])
-        self.assertEqual(self.quiet_mem("state", "y" * 300), 0)
+        self.assertEqual(self.quiet_mem("state", "y" * 500), 0)
         self.assertEqual(
-            len(self.q("SELECT current_state FROM shells WHERE shell_id=1")[0]), 300)
+            len(self.q("SELECT current_state FROM shells WHERE shell_id=1")[0]), 500)
 
     def test_grandfathered_rows_stay_readable_and_renderable(self):
         """The legacy corpus predates the caps, so it has to survive them.

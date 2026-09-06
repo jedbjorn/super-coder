@@ -749,7 +749,7 @@ class ApiMemTest(unittest.TestCase):
         self.run_mem("task", "done", str(tid))
         self.assertEqual(self.q("SELECT status FROM spec_tasks WHERE task_id=?", tid)[0], "done")
 
-    def test_legacy_mem_qaqc_command_uses_the_sprint_approval_surface(self):
+    def test_mem_doc_qaqc_records_pass_fail_on_the_sprint_approval_surface(self):
         self.run_mem("roadmap", "add", "feat QAQC")
         fid = self.q("SELECT feature_id FROM roadmap WHERE title='feat QAQC'")[0]
         body = self.tmp / "qaqc.md"
@@ -769,9 +769,7 @@ class ApiMemTest(unittest.TestCase):
         try:
             self.assertEqual(
                 0,
-                self.run_mem(
-                    "doc", "qaqc", str(did), "--verdict", "approved"
-                ),
+                self.run_mem("doc", "qaqc", str(did), "--verdict", "pass"),
             )
         finally:
             mem.SC_API_TOKEN = original_token
