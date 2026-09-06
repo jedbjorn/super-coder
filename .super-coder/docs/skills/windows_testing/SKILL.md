@@ -135,9 +135,13 @@ status/acquire/start/push/exec/pull/reset/release run, then confirm lease
 conflicts, protected snapshot refusal, and failed-promotion preservation.
 
 After the reviewed engine revision is installed in active dos-arch, import this
-file as a fork-local skill:
+file as a fork-local skill. Every `sc skill` mutation is Planner-owned: the
+Admin repins the engine, then a launched Planner shell runs the import and
+grants. When no Planner is booted, the Admin asks the FnB to boot one rather
+than running these commands from the Admin seat, where they are refused.
 
 ```bash
+# on a launched Planner shell
 sc skill put --file .super-coder/docs/skills/windows_testing/SKILL.md
 sc skill grant windows_testing <dev-shortname> <reviewer-shortname>
 sc skill list
