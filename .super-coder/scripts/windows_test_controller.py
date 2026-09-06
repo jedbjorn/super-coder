@@ -680,7 +680,12 @@ try {{
   $p = Start-Process powershell.exe -WorkingDirectory $target -ArgumentList @('-NoProfile','-NonInteractive','-File',('"' + $scriptPath + '"')) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
   $finished = $p.WaitForExit({wait * 1000})
   if (-not $finished) {{ $null = & taskkill.exe /PID $p.Id /T /F; $p.WaitForExit() }}
-  $result = @{{ exit_code = $(if ($finished) {{ $p.ExitCode }} else {{ 124 }}); stdout = $(if (Test-Path $stdoutPath) {{ [IO.File]::ReadAllText($stdoutPath) }} else {{ '' }}); stderr = $(if (Test-Path $stderrPath) {{ [IO.File]::ReadAllText($stderrPath) }} else {{ '' }}); timed_out = (-not $finished) }}
+  if ($finished) {{
+    $p.WaitForExit()
+    $exitCode = $p.ExitCode
+    if ($null -eq $exitCode) {{ throw 'child process exit code is unavailable' }}
+  }} else {{ $exitCode = 124 }}
+  $result = @{{ exit_code = $exitCode; stdout = $(if (Test-Path $stdoutPath) {{ [IO.File]::ReadAllText($stdoutPath) }} else {{ '' }}); stderr = $(if (Test-Path $stderrPath) {{ [IO.File]::ReadAllText($stderrPath) }} else {{ '' }}); timed_out = (-not $finished) }}
   $result | ConvertTo-Json -Compress
 }} finally {{ Remove-Item -LiteralPath $scriptPath,$stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue }}
 """
@@ -696,8 +701,23 @@ try {{
                     state["uncertain_exec"] = True
                     self._save_state(state)
                 raise
+            raw_exit_code = result.get("exit_code")
+            if isinstance(raw_exit_code, bool) or not isinstance(
+                raw_exit_code, (int, str)
+            ):
+                raise ControllerError(
+                    "guest_response_invalid",
+                    "guest PowerShell returned an invalid child exit code",
+                )
+            try:
+                exit_code = int(raw_exit_code)
+            except (TypeError, ValueError) as exc:
+                raise ControllerError(
+                    "guest_response_invalid",
+                    "guest PowerShell returned an invalid child exit code",
+                ) from exc
             return {
-                "exit_code": int(result.get("exit_code", -1)),
+                "exit_code": exit_code,
                 "stdout": str(result.get("stdout", "")),
                 "stderr": str(result.get("stderr", "")),
                 "timed_out": bool(result.get("timed_out")),
@@ -861,10 +881,11 @@ try {{
                 "push payload_bytes must be a non-negative integer",
             )
         wait = _validated_timeout(timeout, 300)
-        body = """
-$input = [Console]::OpenStandardInput()
+        body = f"""
+$stdinStream = [Console]::OpenStandardInput()
 $file = [IO.File]::Open($target, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
-try { $input.CopyTo($file) } finally { $file.Dispose() }
+try {{ $stdinStream.CopyTo($file) }} finally {{ $file.Dispose() }}
+if ((Get-Item -LiteralPath $target).Length -ne {size}) {{ throw 'uploaded file size mismatch' }}
 """
         script = self._workspace_script(dest, body, must_exist=False)
         with self._locked():
@@ -1149,7 +1170,22 @@ def client_request(
         with input_path.open("rb") as source:
             shutil.copyfileobj(source, process_stdin, CHUNK_SIZE)
     process_stdin.close()
-    response = _read_header(process_stdout)
+    try:
+        response = _read_header(process_stdout)
+    except ControllerError as exc:
+        if exc.code != "protocol_header_invalid":
+            raise
+        rc = process.wait()
+        stderr = (
+            process.stderr.read(2000).decode("utf-8", "replace")
+            if process.stderr
+            else ""
+        )
+        raise ControllerError(
+            "transport_failed",
+            "controller transport exited without a valid response",
+            {"exit_code": rc, "stderr": stderr},
+        ) from exc
     expected = int((response.get("result") or {}).get("payload_bytes", 0))
     tmp: Path | None = None
     try:

@@ -261,7 +261,41 @@ def test_exec_is_encoded_admin_powershell_and_never_host_shell(subject):
     decoded = base64.b64decode(ssh_call[-1].rsplit(" ", 1)[-1]).decode("utf-16-le")
     assert "WindowsBuiltInRole]::Administrator" in decoded
     assert "taskkill.exe /PID $p.Id /T /F" in decoded
+    assert "$p.WaitForExit()" in decoded
+    assert "$null -eq $exitCode" in decoded
     assert "-WorkingDirectory $target" in decoded
+
+
+def test_exec_rejects_null_guest_exit_code_with_structured_error(subject):
+    controller, runner, _popen, _clock = subject
+    token = acquire(subject)
+    original_call = runner.__call__
+
+    def null_exit_code(argv, **kwargs):
+        if argv[0] == "ssh":
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                '{"exit_code":null,"stdout":"","stderr":"","timed_out":false}\n',
+                "",
+            )
+        return original_call(argv, **kwargs)
+
+    controller.run = null_exit_code
+    stdin = io.BytesIO(
+        json.dumps(
+            {"operation": "exec", "lease": token, "command": "Get-Date", "cwd": "run"}
+        ).encode()
+        + b"\n"
+    )
+    stdout = io.BytesIO()
+
+    assert controller_mod.serve_once(stdin, stdout, controller) == 1
+    response = json.loads(stdout.getvalue())
+    assert response["error"]["code"] == "guest_response_invalid"
+    assert response["error"]["message"] == (
+        "guest PowerShell returned an invalid child exit code"
+    )
 
 
 def test_uncertain_transport_timeout_blocks_reset_until_explicit_stop(subject):
@@ -302,6 +336,9 @@ def test_push_and_pull_stream_without_halo_paths(subject):
     )
     assert "ReparsePoint" in push_script
     assert "ReparsePoint" in pull_script
+    assert "$stdinStream = [Console]::OpenStandardInput()" in push_script
+    assert "$input =" not in push_script
+    assert "Length -ne 4" in push_script
 
 
 @pytest.mark.parametrize(
@@ -482,6 +519,28 @@ def test_failed_pull_transport_does_not_replace_existing_result(tmp_path, monkey
 
     assert caught.value.code == "transport_failed"
     assert target.read_bytes() == b"old"
+
+
+def test_client_preserves_child_error_when_response_frame_is_missing(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    controller_mod._atomic_json(
+        tmp_path / ".sc-state/local/windows-test-client.json",
+        {"transport": "local"},
+    )
+    process = FakeProcess(response=b"", rc=1)
+    process.stderr = io.BytesIO(b"TypeError: null exit code\n")
+    monkeypatch.setattr(controller_mod, "_client_process", lambda _cfg: process)
+
+    with pytest.raises(controller_mod.ControllerError) as caught:
+        controller_mod.client_request({"operation": "status"})
+
+    assert caught.value.code == "transport_failed"
+    assert caught.value.details == {
+        "exit_code": 1,
+        "stderr": "TypeError: null exit code\n",
+    }
 
 
 def test_fork_local_skill_template_is_ready_for_supported_import():
