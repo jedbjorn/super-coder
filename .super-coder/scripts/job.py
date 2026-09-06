@@ -118,6 +118,43 @@ def next_job_id(label: "str | None") -> str:
     return f"{n}-{label}" if label else str(n)
 
 
+def _start_ticks(pid: int) -> "int | None":
+    """Field 22 of /proc/<pid>/stat — the process's start time in clock ticks
+    since boot. Together with the pid it names one process incarnation: a
+    recycled pid carries a different value. None when the pid is gone or the
+    host has no procfs."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+        return int(stat.rsplit(")", 1)[1].split()[19])
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def _has_procfs() -> bool:
+    return Path("/proc/self/stat").exists()
+
+
+def kill_refusal(meta: dict, pid: int) -> "str | None":
+    """Why `kill` must not signal `pid`, or None when it is still the job's own
+    process. A recorded pid is only an identity while its incarnation matches;
+    once the OS recycles it, killpg would hit a stranger's process group (#954
+    — a foreign install's watchers died this way). Mismatch, gone, or
+    unverifiable all count as 'not ours to kill'."""
+    recorded = meta.get("start_ticks")
+    live = _start_ticks(pid)
+    if live is None:
+        if _has_procfs():
+            return f"pid {pid} is gone — nothing to kill; the supervisor records the exit"
+        return None   # no procfs: nothing to verify against; legacy behavior
+    if recorded is None:
+        return (f"pid {pid} has no recorded identity (job started before this "
+                f"engine version) — refusing to signal it blind; verify and kill it by hand")
+    if int(recorded) != live:
+        return (f"pid {pid} was recycled by the OS (recorded start {recorded}, live "
+                f"{live}) — it is no longer this job's process; nothing killed")
+    return None
+
+
 def is_finished(meta: dict) -> bool:
     return meta.get("finished_at") is not None
 
@@ -215,6 +252,7 @@ def supervise(jobdir: Path, notify=send_completion) -> int:
         return 127
 
     meta["pid"] = child.pid
+    meta["start_ticks"] = _start_ticks(child.pid)
     write_meta(jobdir, meta)
 
     timeout = meta.get("timeout")
@@ -387,6 +425,9 @@ def cmd_kill(args) -> int:
     pid = meta.get("pid")
     if not pid:
         die(f"job '{args.id}' has no recorded pid yet — try again in a moment")
+    refusal = kill_refusal(meta, int(pid))
+    if refusal:
+        die(f"job '{args.id}': {refusal}")
     meta["killed"] = True
     write_meta(jobdir, meta)
     _kill_group(int(pid))
