@@ -261,6 +261,11 @@ _TIMEOUT = 10         # default per-request HTTP timeout (seconds)
 # the generic timeout a slow success surfaced as "API unreachable" and a PATCH
 # retry re-ran the whole serialize (SC-013). Doc writes carry their own budget.
 _DOC_WRITE_TIMEOUT = 420
+# Skill mutations (put/grant/revoke/rm/retire/unretire) commit and then run
+# the same synchronous snapshot+render pipeline, fanning the projection out to
+# every shell worktree; the generic timeout reported a landed put as
+# "unreachable" (#1507). Same budget as doc writes.
+_SKILL_WRITE_TIMEOUT = _DOC_WRITE_TIMEOUT
 
 
 def _api(method: str, path: str, payload: "dict | None" = None,
@@ -319,9 +324,13 @@ def _api(method: str, path: str, payload: "dict | None" = None,
             if timed_out and idempotent and not last:
                 time.sleep(_RETRY_PAUSE)
                 continue
-            hint = (" — the write MAY have landed server-side; check before "
-                    "resending" if timed_out and not idempotent else "")
-            die(f"API unreachable ({SC_API_BASE}): {exc}{hint}")
+            if timed_out and not idempotent:
+                # The server accepted the request and is still working; this
+                # is a lost receipt, never an unreachable API (#1507, #1379).
+                die(f"API {method} {path} gave no receipt within {timeout:g}s — "
+                    "the write MAY have landed server-side; verify with a read "
+                    "before resending")
+            die(f"API unreachable ({SC_API_BASE}): {exc}")
 
 
 def _finish_api(summary: str) -> int:

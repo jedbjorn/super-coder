@@ -44,8 +44,16 @@ def _integer_list(values: list[int] | None) -> list[int]:
     return list(dict.fromkeys(values or ()))
 
 
+# Sprint writes commit atomically but do real work before the receipt: arm
+# probes every bound harness CLI in preflight and queues the initial wakes.
+# The generic 10s budget reported a committed arm as "unreachable" (#1379).
+_WRITE_TIMEOUT = 120
+
+
 def _post(path: str, payload: dict, *, idempotent: bool = False) -> dict:
-    return mem._api("POST", path, payload, idempotent=idempotent)
+    return mem._api(
+        "POST", path, payload, idempotent=idempotent, timeout=_WRITE_TIMEOUT
+    )
 
 
 def cmd_declare(args: argparse.Namespace) -> int:

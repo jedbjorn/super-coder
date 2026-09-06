@@ -666,9 +666,11 @@ class SkillApiLaneTest(unittest.TestCase):
         """A masked DB path raises OSError/PermissionError — the call reroutes."""
         draft = self.write_draft("loc_api")
         api_calls: list[tuple[str, str, dict]] = []
+        api_kwargs: list[dict] = []
 
         def fake_api(method, path, payload, *, idempotent=None, **kwargs):
             api_calls.append((method, path, payload))
+            api_kwargs.append({"idempotent": idempotent, **kwargs})
             if path == "/_sc/skills/put":
                 return {
                     "ok": True,
@@ -687,6 +689,14 @@ class SkillApiLaneTest(unittest.TestCase):
         self.assertEqual(api_calls[0][0], "POST")
         self.assertEqual(api_calls[0][1], "/_sc/skills/put")
         self.assertIn("loc_api", api_calls[0][2].get("content", ""))
+        # #1507: put commits then renders every shell; it carries the render
+        # budget, never the generic 10s timeout that reported a landed put as
+        # "unreachable".
+        self.assertEqual(
+            {"idempotent": False, "timeout": skill_mod.mem._SKILL_WRITE_TIMEOUT},
+            api_kwargs[0],
+        )
+        self.assertGreater(skill_mod.mem._SKILL_WRITE_TIMEOUT, skill_mod.mem._TIMEOUT)
 
     def test_api_fallback_does_not_swallow_no_db(self):
         """`no live DB` (a missing/empty engine DB on a host seat) still dies."""

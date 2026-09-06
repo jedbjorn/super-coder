@@ -437,7 +437,7 @@ def cmd_put_api(path: Path) -> int:
     except DraftValidationError as exc:
         sys.exit(f"sc skill: draft {path}: {exc}")
     result = mem._api(
-        "POST", "/_sc/skills/put", {"content": text}, idempotent=False
+        "POST", "/_sc/skills/put", {"content": text}, idempotent=False, timeout=mem._SKILL_WRITE_TIMEOUT
     )
     print(f"put: {result['name']} {result['verb']} (via engine API); "
           "grants unchanged")
@@ -447,7 +447,7 @@ def cmd_put_api(path: Path) -> int:
 def cmd_grant_api(name: str, shell_refs: list[str]) -> int:
     result = mem._api(
         "POST", "/_sc/skills/grant",
-        {"name": name, "shells": shell_refs}, idempotent=False,
+        {"name": name, "shells": shell_refs}, idempotent=False, timeout=mem._SKILL_WRITE_TIMEOUT,
     )
     for row in result.get("results") or []:
         suffix = "" if row["changed"] else "  (already granted)"
@@ -459,7 +459,7 @@ def cmd_grant_api(name: str, shell_refs: list[str]) -> int:
 def cmd_revoke_api(name: str, shell_refs: list[str]) -> int:
     result = mem._api(
         "POST", "/_sc/skills/revoke",
-        {"name": name, "shells": shell_refs}, idempotent=False,
+        {"name": name, "shells": shell_refs}, idempotent=False, timeout=mem._SKILL_WRITE_TIMEOUT,
     )
     for row in result.get("results") or []:
         suffix = "" if row["changed"] else "  (was not granted)"
@@ -470,7 +470,7 @@ def cmd_revoke_api(name: str, shell_refs: list[str]) -> int:
 
 def cmd_rm_api(name: str) -> int:
     result = mem._api(
-        "POST", "/_sc/skills/rm", {"name": name}, idempotent=False
+        "POST", "/_sc/skills/rm", {"name": name}, idempotent=False, timeout=mem._SKILL_WRITE_TIMEOUT
     )
     suffix = " (already removed; persistence reconciled)" if result.get(
         "already_removed") else ""
@@ -483,7 +483,7 @@ def cmd_rm_api(name: str) -> int:
 
 def cmd_retire_api(name: str) -> int:
     result = mem._api(
-        "POST", "/_sc/skills/retire", {"name": name}, idempotent=False
+        "POST", "/_sc/skills/retire", {"name": name}, idempotent=False, timeout=mem._SKILL_WRITE_TIMEOUT
     )
     listed = "  (already listed)" if result.get("already_listed") else ""
     print(f"retire: {result['name']}{listed} — retired fork-wide; "
@@ -494,7 +494,7 @@ def cmd_retire_api(name: str) -> int:
 
 def cmd_unretire_api(name: str) -> int:
     result = mem._api(
-        "POST", "/_sc/skills/unretire", {"name": name}, idempotent=False
+        "POST", "/_sc/skills/unretire", {"name": name}, idempotent=False, timeout=mem._SKILL_WRITE_TIMEOUT
     )
     print(f"unretire: {result['name']} — restored with {result['grants']} "
           "grant(s) live again. (via engine API)")

@@ -114,6 +114,7 @@ class SprintCliDispatcherTest(unittest.TestCase):
                 "reason": "Reviewer decision 1667",
             },
             idempotent=True,
+            timeout=sprint_cli._WRITE_TIMEOUT,
         )
         self.assertEqual(response, json.loads(output.getvalue()))
 
@@ -167,6 +168,7 @@ class SprintCliDispatcherTest(unittest.TestCase):
                     "adopt_legacy": True,
                 },
                 idempotent=True,
+                timeout=sprint_cli._WRITE_TIMEOUT,
             ),
             api.call_args_list[1],
         )
@@ -2089,6 +2091,7 @@ class SprintCliApiTest(unittest.TestCase):
             "/_sc/sprint/qaqc",
             {"document_id": document_id, "verdict": "pass"},
             idempotent=True,
+            timeout=sprint_cli._WRITE_TIMEOUT,
         )
         self.assertTrue(approval["created"])
         mem.SC_API_TOKEN = TOKENS["developer"]
@@ -2098,6 +2101,7 @@ class SprintCliApiTest(unittest.TestCase):
                 "/_sc/sprint/qaqc",
                 {"document_id": document_id, "verdict": "pass"},
                 idempotent=True,
+                timeout=sprint_cli._WRITE_TIMEOUT,
             )
 
         participants = self.write(
