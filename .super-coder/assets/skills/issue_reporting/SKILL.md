@@ -46,7 +46,7 @@ Stale guidance (skill says X, engine does Y) files the same as a crash.
 
 ## Capture — while the failure is on screen
 
-- **engine ref** = `sc engine-ref` — first line of every report
+- **engine ref** = `sc engine-ref` — first line of every report (Subfloor's engine commit)
 - **staleness** = compare that ref to upstream head:
   `git ls-remote https://github.com/jedbjorn/subfloor HEAD` — write
   `current` or `behind head <sha7>`. Behind + the symptom is a missing
@@ -90,7 +90,7 @@ file a duplicate.
 
 No `gh` / no network from your seat -> save the identical body as a fork flag:
 `sc mem flag open "[Engine] <symptom> | Blocker for: <x>" --name UP-###`, then
-message the **admin** shell to relay it upstream (see `messaging`).
+message the **admin** shell to relay it upstream.
 
 ## Authorized curation recommendation
 

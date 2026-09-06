@@ -15,12 +15,12 @@ Live `shell_db.db` = the single source of truth shared by every shell; a
 an edit not yet serialized is discarded by a rebuild.
 
 Serializing is an admin/GUI operation, NOT a per-write shell step: it writes
-the shared instance's gitignored local cache. `sc snapshot`
-and `sc render flat` refuse unless `SC_ADMIN=1` (GUI/API, `install`, `update`,
-and `render-check` set it for you). A shell does not run them; its writes are
-captured when admin saves locally (GUI **Save locally** button, or
-`SC_ADMIN=1 sc snapshot`) before a rebuild. The rest of this skill = the
-admin/GUI path.
+the shared instance's gitignored local cache. `sc snapshot` and `sc render`
+run from the main checkout; the dispatcher refuses them from a linked shell
+worktree. The GUI **Save locally** button, `install`, `update`, and
+`render-check` run them for you. A working shell does not run them; its writes
+are captured when admin saves locally before a rebuild. The rest of this skill
+= the admin/GUI path.
 
 ## The three text serializations
 
@@ -40,13 +40,13 @@ to local; mode switching and Git publication are retired.
 
 ## When admin serializes
 
-All commands require `SC_ADMIN=1`, run from the main checkout.
+All commands run from the main checkout.
 
-1. `SC_ADMIN=1 sc snapshot` -> dumps the per-instance tables to the active
+1. `sc snapshot` -> dumps the per-instance tables to the active
    local snapshot path. Deterministic DELETE-then-INSERT in PK order makes
    re-running byte-identical.
 
-2. `SC_ADMIN=1 sc render` -> regenerates the flat `_sc` files
+2. `sc render` -> regenerates the flat `_sc` files
    (`renders/specs_sc/`, `renders/docs_sc/`, `renders/skills_sc/`,
    `renders/roadmap_sc.md`) beneath `.sc-state/local/`. Run
    after changing a document body, the roadmap, or skills. Incremental —
@@ -88,5 +88,5 @@ This skill owns the render/snapshot pipeline + the `render-check` guard:
   snapshot.
 - `engine_migrations` — a **content-seed** migration (skills, flavor defaults)
   changes what renders; rebuild + render + `render-check` after.
-- `docs` / `spec` — document bodies live in the DB, render to `docs_sc/` /
-  `specs_sc/`; authored via `sc mem doc`, serialized here.
+- Document bodies live in the DB, render to `docs_sc/` / `specs_sc/`;
+  authored via `sc mem doc`, serialized here.

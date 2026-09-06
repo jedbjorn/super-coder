@@ -18,8 +18,8 @@ reaches a shell, and a sandboxed shell needs no network egress.
 - A fact that changes: a library's current API, a release note, a CLI flag, a
   version's known bug, an error message you cannot explain from the code.
 - Before guessing at an external service's protocol or a package's behaviour.
-- Never for anything the repo catalogue or your own memory already answers —
-  map first, memory second, search third.
+- Never for anything the repo, its catalogue, or your own memory already
+  answers.
 
 ## The verb
 

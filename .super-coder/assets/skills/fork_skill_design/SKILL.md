@@ -68,11 +68,9 @@ sc skill list
 projections reconcile. Naming a standard shell changes its shared flavor pack;
 naming a Bespoke shell changes only that shell. Creation grants nothing.
 
-A launched Planner seat runs under the restricted execution view and cannot
-open the engine DB directly; every `sc skill` verb then falls back to the
-engine API's Planner-owned skill lane, which runs the identical validation and
-persistence server-side. `sc skill list` shows each row's category so a
-redraft can carry the existing metadata forward.
+On a launched Planner seat the same `sc skill` verbs run through the engine
+API with identical validation and persistence. `sc skill list` shows each
+row's category so a redraft can carry the existing metadata forward.
 
 ## Update, retire, and recover
 
@@ -85,8 +83,8 @@ sc skill rm <skill_name>
 Retry the exact command after fixing a reported snapshot, render, or projection
 path. Pass = the full persistence receipt returns and the projected body
 matches `sc skill list` plus the intended grant. On a launched seat the same
-receipt rides the API fallback, so a failure names which of the four layers
-(DB, snapshot, flat render, projection) is still outstanding. `rm` is only for
+receipt names which of the four layers (DB, snapshot, flat render,
+projection) is still outstanding. `rm` is only for
 fork-local names; retire an upstream skill with `sc skill retire <name>` and
 restore it with `sc skill unretire <name>`. The retire list is instance-local
 state and rides `sc update`; it is never committed.
