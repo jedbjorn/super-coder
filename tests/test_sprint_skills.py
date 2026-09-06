@@ -19,10 +19,10 @@ ASSETS = ENGINE / "assets" / "skills"
 TEMPLATES = ENGINE / "templates"
 sys.path.insert(0, str(ENGINE / "scripts"))
 
-import seed_skills  # noqa: E402
-import shell_factory  # noqa: E402
-import sprint_cli  # noqa: E402
-import sprint_message_delivery  # noqa: E402
+import seed_skills
+import shell_factory
+import sprint_cli
+import sprint_message_delivery
 
 PROTOCOL = "sprint_protocol"
 ROLE_SKILLS = {
