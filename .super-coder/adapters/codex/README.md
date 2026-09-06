@@ -24,6 +24,7 @@ billing. opencode stays as the universal metered catch-all.
 | `env` | extra env merged into the launch environment |
 | `model` | `{ "flag": "--model" }` — run.py appends `--model <id>` for the flavor's codex model |
 | `headless.effort` | maps requested effort to `-c model_reasoning_effort="<level>"` |
+| `host_admin.launch_flags` | grants the direct-host Admin the unrestricted filesystem policy its maintenance mandate requires |
 | `sandbox.launch_flags` | flags appended ONLY inside the docker sandbox (`SC_SANDBOX`) |
 
 ## Branch-guard hook
@@ -63,6 +64,11 @@ the cwd-branch check.
 mounted from the host — so `codex` must be installed + logged in on the host once:
 `curl -fsSL https://chatgpt.com/codex/install.sh | sh` then `codex` and sign in
 with ChatGPT. That writes `~/.codex/auth.json`, which `./sc launch` mounts in.
+
+The direct-host Admin launch adds `--sandbox danger-full-access` and
+`--ask-for-approval never`. This is scoped to `subfloor admin`: ordinary host
+shells retain Codex's default filesystem sandbox, while the Admin can update the
+owner-private engine state required by its maintenance mandate.
 
 ## Conversation capability
 
