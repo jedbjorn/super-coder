@@ -26,6 +26,7 @@ import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 ENGINE = Path(__file__).resolve().parents[1] / ".super-coder"
 SCHEMA = ENGINE / "schema.sql"
@@ -41,6 +42,37 @@ PEER_TOKEN = "peer-token-cafebabe"   # second shell — cross-shell read coverag
 REVIEW_TOKEN = "review-token-012345"
 PLANNER_TOKEN = "planner-token-6789ab"
 
+
+
+class TimeoutReceiptTest(unittest.TestCase):
+    """A timed-out write is a lost receipt, not an unreachable API (#1507, #1379)."""
+
+    def setUp(self):
+        self._pause = mem._RETRY_PAUSE
+        mem._RETRY_PAUSE = 0.0
+
+    def tearDown(self):
+        mem._RETRY_PAUSE = self._pause
+
+    def _timeout_message(self, method, path, **kwargs):
+        stderr = io.StringIO()
+        with mock.patch.object(
+            mem.urllib.request, "urlopen", side_effect=TimeoutError("timed out")
+        ), contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
+            mem._api(method, path, {"x": 1} if method == "POST" else None, **kwargs)
+        return str(caught.exception)
+
+    def test_non_idempotent_timeout_names_the_write_and_budget(self):
+        message = self._timeout_message("POST", "/_sc/skills/put", timeout=420)
+        self.assertIn("POST /_sc/skills/put", message)
+        self.assertIn("420s", message)
+        self.assertIn("MAY have landed", message)
+        self.assertNotIn("unreachable", message)
+
+    def test_idempotent_timeout_still_reports_unreachable(self):
+        message = self._timeout_message("GET", "/_sc/mem/whoami")
+        self.assertIn("API unreachable", message)
+        self.assertNotIn("MAY have landed", message)
 
 class MemMessageHelpContractTest(unittest.TestCase):
     def test_authored_send_help_matches_parser_options(self):
