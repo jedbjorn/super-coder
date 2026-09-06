@@ -262,7 +262,8 @@ def test_exec_is_encoded_admin_powershell_and_never_host_shell(subject):
     assert "WindowsBuiltInRole]::Administrator" in decoded
     assert "taskkill.exe /PID $p.Id /T /F" in decoded
     assert "$p.WaitForExit()" in decoded
-    assert "$null -eq $exitCode" in decoded
+    assert "$null = $p.Handle" in decoded
+    assert decoded.index("$null = $p.Handle") < decoded.index("$p.WaitForExit(")
     assert "-WorkingDirectory $target" in decoded
 
 
@@ -276,7 +277,8 @@ def test_exec_rejects_null_guest_exit_code_with_structured_error(subject):
             return subprocess.CompletedProcess(
                 argv,
                 0,
-                '{"exit_code":null,"stdout":"","stderr":"","timed_out":false}\n',
+                '{"exit_code":null,"stdout":"partial\\n",'
+                '"stderr":"child said why","timed_out":false}\n',
                 "",
             )
         return original_call(argv, **kwargs)
@@ -296,6 +298,10 @@ def test_exec_rejects_null_guest_exit_code_with_structured_error(subject):
     assert response["error"]["message"] == (
         "guest PowerShell returned an invalid child exit code"
     )
+    assert response["error"]["details"] == {
+        "stdout": "partial\n",
+        "stderr": "child said why",
+    }
 
 
 def test_uncertain_transport_timeout_blocks_reset_until_explicit_stop(subject):

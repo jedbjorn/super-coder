@@ -678,12 +678,12 @@ $stderrPath = Join-Path $env:TEMP ("sc-test-" + $id + ".err")
 try {{
   [IO.File]::WriteAllText($scriptPath, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{command_b64}')), [Text.UTF8Encoding]::new($false))
   $p = Start-Process powershell.exe -WorkingDirectory $target -ArgumentList @('-NoProfile','-NonInteractive','-File',('"' + $scriptPath + '"')) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
+  $null = $p.Handle # redirected Start-Process reports no ExitCode unless the handle is cached
   $finished = $p.WaitForExit({wait * 1000})
   if (-not $finished) {{ $null = & taskkill.exe /PID $p.Id /T /F; $p.WaitForExit() }}
   if ($finished) {{
     $p.WaitForExit()
     $exitCode = $p.ExitCode
-    if ($null -eq $exitCode) {{ throw 'child process exit code is unavailable' }}
   }} else {{ $exitCode = 124 }}
   $result = @{{ exit_code = $exitCode; stdout = $(if (Test-Path $stdoutPath) {{ [IO.File]::ReadAllText($stdoutPath) }} else {{ '' }}); stderr = $(if (Test-Path $stderrPath) {{ [IO.File]::ReadAllText($stderrPath) }} else {{ '' }}); timed_out = (-not $finished) }}
   $result | ConvertTo-Json -Compress
@@ -701,25 +701,27 @@ try {{
                     state["uncertain_exec"] = True
                     self._save_state(state)
                 raise
+            stdout = str(result.get("stdout", ""))
+            stderr = str(result.get("stderr", ""))
             raw_exit_code = result.get("exit_code")
-            if isinstance(raw_exit_code, bool) or not isinstance(
+            invalid = isinstance(raw_exit_code, bool) or not isinstance(
                 raw_exit_code, (int, str)
-            ):
+            )
+            if not invalid:
+                try:
+                    exit_code = int(raw_exit_code)
+                except ValueError:
+                    invalid = True
+            if invalid:
                 raise ControllerError(
                     "guest_response_invalid",
                     "guest PowerShell returned an invalid child exit code",
+                    {"stdout": stdout[-500:], "stderr": stderr[-500:]},
                 )
-            try:
-                exit_code = int(raw_exit_code)
-            except (TypeError, ValueError) as exc:
-                raise ControllerError(
-                    "guest_response_invalid",
-                    "guest PowerShell returned an invalid child exit code",
-                ) from exc
             return {
                 "exit_code": exit_code,
-                "stdout": str(result.get("stdout", "")),
-                "stderr": str(result.get("stderr", "")),
+                "stdout": stdout,
+                "stderr": stderr,
                 "timed_out": bool(result.get("timed_out")),
             }
 
