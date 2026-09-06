@@ -9,7 +9,7 @@ common: false
 
 Planner-owned. Run periodically or when the FnB asks for delivery-state
 reconciliation; never make it a boot ritual. Working shells close the flags
-their own work clears (boot doc, "Finish before you stop"); this sweep is the
+their own work clears; this sweep is the
 backstop for dropped handoffs + shipped work nobody documented. Two directions:
 close what's provably resolved, open what's provably missing.
 
@@ -23,8 +23,8 @@ Run `sc mem delivery-audit`. The Planner-only API response contains
 guards below without granting arbitrary engine SQL.
 
 `frozen_docs` counts ANY frozen document on the feature — kind='spec' AND
-kind='doc' both qualify (#319: forks that freeze kind='doc' rows for shipped
-docs got false "undocumented" positives every sweep under a spec-only count).
+kind='doc' both qualify, so a fork that freezes its shipped `doc` rows is
+never reported as undocumented.
 
 Sort every open flag into exactly one bucket (Step 2 / Step 4). Auto-close
 only on unambiguous evidence — any doubt -> Step 4, not a close.
@@ -59,8 +59,7 @@ later) + `frozen_docs > 0`. Shipped-but-undocumented -> leave open:
 sc mem flag close <flag_id> --notes "Auto: feature #<id> (<title>) now shipped with a frozen doc (flag_sweep)."
 ```
 
-NEVER message on close (per the `flags` skill — messages pair with `open`).
-NEVER reopen a flag. A close whose evidence you had to infer -> Step 4.
+NEVER message on close. NEVER reopen a flag. A close whose evidence you had to infer -> Step 4.
 
 ---
 
@@ -72,8 +71,8 @@ apply. Pick `SC-###` from the highest numbered value in `recent_flag_names`.
 
 ### 3A — Implemented but not marked shipped (ship-drift)
 
-The dev flips the horizon to `shipped` when Verification passes (`spec` skill,
-hand-off step) — the flip sometimes gets missed. Deterministic signal = spec's
+The dev flips the horizon to `shipped` when Verification passes — the flip
+sometimes gets missed. Deterministic signal = spec's
 **Verification task `done`** + feature **not** `shipped`. Open a durable
 `[Ship]` flag — it governs both halves of the dropped hand-off (mark shipped +
 reconcile the doc to the spec) and stays open until a planner does both.
@@ -99,13 +98,9 @@ Use the `shipped_but_undocumented` rows. The projection includes only shipped
 features with no frozen document and no open `[Docs]` or organic docs-pending
 handoff.
 
-The dedup guards match the `[Docs]`/`[Ship]` tag at position zero FIRST — the
-templates below mint "doc pending" (singular) and legacy hand-written flags say
-"feature doc pending", so a prose-only `'%docs pending%'` pattern matched
-neither and every later sweep re-listed already-flagged rows (found session
-ADM1/0003, seven covered rows re-surfaced). The `'%doc%pending%'` fallback
-catches untagged organic wordings; its over-breadth only ever SKIPS an open —
-the conservative direction.
+The dedup guards match the `[Docs]`/`[Ship]` tag at position zero first, then
+fall back to `'%doc%pending%'` for untagged organic wordings; the fallback's
+over-breadth only ever SKIPS an open — the conservative direction.
 
 Per row, open the flag in Planner's own queue. Do not message yourself:
 

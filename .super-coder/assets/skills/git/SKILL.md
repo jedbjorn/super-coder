@@ -1,15 +1,24 @@
 ---
 name: git
-description: Git conventions for a Subfloor shell — one repo, one cwd. Sync the base before work, branch before committing, open PRs (merge only at the FnB's gate — an explicit directive, or the Sprint grant for a registered Sprint PR), attribute commits per-shell. Use before any git work.
+description: Git events for a Subfloor shell — GitHub capability recovery, merging a stack the FnB hands you, after-merge cleanup, and what never enters Git. The every-session rules (sync, branch, PR, merge gate, finish) live in your boot.
 category: substrate
 common: false
 ---
 
-# git — version control, the Subfloor way
+# git — the event procedures
 
-One repo at its root -> plain `git` (cwd = repo root) is safe.
+Your boot's VERSION CONTROL section carries the every-session rules: sync the
+base, branch before you build, commit → push → PR → stop, the merge gate's two
+forms, the disposable `shell/<shortname>` base, and the finish gate. This skill
+holds what fires on an event.
 
-Project = this repo minus `.super-coder/`. Engine = `.super-coder/` — gitignored, materialized by `sc update`, authored upstream in Subfloor. NEVER commit or edit anything under `.super-coder/`.
+One repo at its root -> plain `git` (cwd = repo root) is safe. Project = this
+repo minus `.super-coder/`. In a tracking fork the engine (`.super-coder/`) is
+gitignored, materialized by `sc update`, and authored upstream in Subfloor —
+NEVER commit or edit anything under it. In the Subfloor source repository
+(`git ls-files --error-unmatch .super-coder/schema.sql` exits 0) `.super-coder/`
+is tracked project source and `.sc-state/engine.ref` is not the delivery unit;
+engine changes still land by branch and PR.
 
 ## GitHub capability boundary
 
@@ -26,31 +35,6 @@ run `sc launch` or `sc restart`; the running sandbox remains unchanged
 until that refresh. NEVER rewrite the remote or start an interactive login
 inside the sandbox to work around a missing capability.
 
-## Sync before you start — hard pre-code gate
-
-Run the gate every session + before each new unit of work. `shell/<shortname>` = a moving base pinned to `origin/main`, not a content branch — cut feature branches from it. A stale base -> you read code that no longer exists + your PRs conflict on arrival.
-
-The launcher auto-syncs at boot when provably nothing can be lost (on base branch + clean tree + no local-only commits). Read the `sync:` line in ACTIVE SESSION: auto-synced + nothing done since -> current, carry on. Says **NOT auto-synced** / you're mid-session about to start new work -> run:
-
-1. `git fetch origin main && git rev-list --count HEAD..origin/main` -> record remote freshness; continue through the branch/target gate even when the count is 0.
-2. Compare `git rev-parse --show-toplevel` + `git branch --show-current` with ACTIVE SESSION before any destructive command. A mismatch -> stop + surface it.
-3. Exact `shell/<shortname>` base -> discard local-only commits, tracked changes, and non-ignored untracked files without asking: `git reset --hard origin/main && git clean -fd`. Durable coordination belongs in the control plane and code belongs on a pushed remote branch with a PR. Pass = `git status --short` is empty + `git rev-parse HEAD` equals `git rev-parse origin/main`.
-4. NEVER reset or clean a feature branch / open PR. Clean stale feature branch -> `git rebase origin/main`. Dirty or unpushed feature work -> list it + ask the FnB to land / stash / discard.
-5. NEVER `git pull`/merge on the base — merge bubbles accumulate + squash-merged work replays as conflicts.
-
-## Branch -> commit -> push -> PR -> stop
-
-1. NEVER commit to the default branch. Branch first: `git checkout -b <type>/<short-desc>` (feat/fix/chore/docs). *Admin-shell exception:* it boots at the repo root on `main`, exempt from the branch-guard; committing to main is its mandate (engine updates, migrations, approved patches) and it starts each session with `git pull --ff-only`. Every other shell branches, always.
-2. Commit in logical units. End every message with your shell's trailer:
-   ```
-   Co-Authored-By: <shell display_name> (super-coder) <noreply@…>
-   ```
-3. Push -> open a PR -> stop. Merging is the FnB's gate, in one of two forms: outside an armed Sprint, an explicit FnB directive naming the PR; inside one, the grant the FnB gave by arming the Sprint — a registered Sprint PR merges through `sprint_dev`'s merge boundary and needs no second directive. Never wait for one; never merge on approval or green alone.
-
-## The engine watches your PR — you don't
-
-Nothing to enrol. The installation watcher sees which branch your worktree has checked out and subscribes you to the newest PR on it within about a minute of it existing. From then on it wakes you with a self-describing Re-enter fact — inside or outside a Sprint — on red checks, merge, close-without-merge, and red-to-green recovery. Never poll GitHub, schedule a watcher, or ask another shell to relay; stop on the pushed PR and let the fact come to you. Opened the PR from a branch that is not your worktree's checkout? Enrol it by hand: `sc pr subscribe --repository <owner/name> --pr <number>`. A Sprint lane runs `sc sprint register-pr` (same owner subscription; attaches if discovery got there first).
-
 ## Merging a stack (only when the FnB hands you one)
 
 Merge bottom-up, retargeting before each merge — never rely on GitHub's auto-retarget:
@@ -66,21 +50,9 @@ PR already orphaned (base deleted under it) -> the head branch still holds the c
 2. `gh pr reopen <closed-pr>` -> `gh pr edit <closed-pr> --base main`.
 3. Verify `MERGEABLE` -> delete the recreated branch again.
 
-## Finish before you stop
-
-Bookend to the sync gate. At end of session: `git status` (uncommitted) + `git rev-list origin/<base>..HEAD` (unpushed) -> resolve every hit:
-
-1. Real work -> commit (attributed, trailer above) + push + open the PR. Don't skip because the session is ending.
-2. Throwaway / experiment -> discard deliberately: `git restore` / `git stash`.
-3. Genuinely unsure -> surface to the FnB + leave it committed-and-pushed on a branch — never sitting uncommitted.
-
-Pass = tree clean, or on a pushed branch with a PR. A dirty/unpushed tree forces the admin's `git_cleanup` to map attribution, check liveness, and commit on your behalf.
-
 ## After a merge — clean up local
 
-Only after the PR is merged. The `event=merged` wake from your subscription is
-what starts this; confirm it on the remote (`gh pr view <n> --json state,mergedAt`)
-before deleting anything:
+Only after the PR is merged:
 
 A managed worktree whose Sprint is already `completed` is the exception: the
 Sprint cleanup service owns its reset after live turns exit. Do not race that
@@ -96,22 +68,15 @@ NEVER delete a branch carrying unmerged, un-PR'd work — no PR = lost work.
 
 ## Never commit the engine or derived files
 
-- `/.super-coder/` is gitignored — never force-add anything under it.
+- In a fork `/.super-coder/` is gitignored — never force-add anything under it.
 - Gitignored + regenerated, never commit: `CLAUDE.md`, `AGENTS.md`, `opencode.json`, `.claude/skills/`, `.sc-state/engine.ref.prev` (ephemeral rollback pointer).
 - From a worktree, commit only your project's authored files. Generated
   snapshots and `_sc` renders live under ignored `.sc-state/local/` and never
   enter Git. `.sc-state/engine.ref` is the deliberate tracked exception: it is
   the dependency pin and is updated by `sc update`.
-- Exception: in the Subfloor source repo, tracked engine database source is project source; identify exact files through the repository catalogue.
-
-## After DB work
-
-A confirmed `sc mem` write lands in the shared control plane immediately. The
-Admin/API persistence path owns generated serialization and renders; they are
-not a Developer commit or Publish PR.
 
 ## Notes
 
 - Before destructive ops, confirm the repo — `git -C <abs-path>` if ever in doubt.
-- Multi-shell: each shell boots into its own worktree at `.sc-worktrees/<shortname>/` on branch `shell/<shortname>`; the launcher keeps the base pinned to `origin/main` (see the sync gate). Worktree isolation is automatic — no shared cwd. Admin shell = the one exception: repo root on `main`.
+- Multi-shell: each shell boots into its own worktree at `.sc-worktrees/<shortname>/` on branch `shell/<shortname>`; the launcher keeps the base pinned to `origin/main`. Admin shell = the one exception: repo root on `main`, committing there by mandate.
 - UI preview: worktree edits do NOT show on the fork's main dev server. `sc preview` (start once from the main checkout if not running) serves every shell's worktree UI live (HMR) on the fork's `dev_port`, one subdomain each: `http://<shortname>.localhost:<dev_port>/`. The `post-commit` hook prints your URL after each commit — surface that line to the FnB.

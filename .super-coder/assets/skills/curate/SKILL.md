@@ -13,7 +13,7 @@ emergent cluster: five entries can each be a valid distinct rule and only in
 aggregate be five instances of one principle. That is this pass's job, along
 with recommendation, category drift, and size drift.
 
-**Yours alone.** Law 3 and Law 7 reserve curation to the shell. Never hand this
+**Yours alone.** Law 3 and Law 5 reserve curation to the shell. Never hand this
 to a subagent, never let another shell run it for you, never accept a proposed
 retirement from anyone else. Read your own set; decide yourself.
 
@@ -59,40 +59,13 @@ rule, ≤500 chars, hard-enforced.
 ## Pass 3 — Recommend
 
 A cluster of three or more that keeps **recurring across sessions** is a
-candidate reusable process. This recommendation route is the authorized
-exception to the "enhancement ideas go to the FnB first" gate in
-`issue_reporting`. Curation never creates or promotes a skill directly.
-Deduplicate against all upstream issues first:
-
-```bash
-gh issue list --repo jedbjorn/subfloor --state all --search "skills: recommend <topic>"
-```
-
-An existing recommendation gets the new evidence in a comment. Otherwise open
-one issue titled `skills: recommend <topic>` containing:
-
-- the trigger that makes the procedure useful;
-- the repeated incidents that exposed the need;
-- the proposed ownership boundary;
-- the expected users;
-- why existing skills do not cover it; and
-- a compact candidate procedure.
-
-```bash
-gh issue comment <number> --repo jedbjorn/subfloor --body "<new evidence>"
-gh issue create --repo jedbjorn/subfloor \
-  --title "skills: recommend <topic>" \
-  --body "<trigger, incidents, ownership, users, coverage gap, procedure>"
-```
-
-Keep one compressed L&S entry carrying the knowledge until a reviewed upstream
-skill ships **and is granted**. Filing or updating an issue is not grounds to
+candidate reusable process. Follow the recommendation route in
+`issue_reporting` — search first, then comment on the matching
+`skills: recommend <topic>` issue or open one. Curation never creates or
+promotes a skill. Keep one compressed L&S entry carrying the knowledge until a
+reviewed upstream skill ships **and is granted**; filing is not grounds to
 retire it. If issue search or creation is unavailable, surface the failure to
 the FnB, keep the L&S, and create no local skill or asset.
-
-Deliberate fork-specific skill authoring is separate from curation and remains
-Planner-owned. The Planner follows `fork_skill_design`: draft → DB persist →
-grant → projection and snapshot receipts.
 
 ## Pass 4 — Category
 

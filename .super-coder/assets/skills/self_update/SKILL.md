@@ -28,7 +28,8 @@ you.
    on top of a stranded one stacks two engine bumps into one diff. Glance at
    `current_state` + make it true for now (the snapshot captures it).
 
-2. **Run.** `sc update` — fetches the engine from the `super-coder` remote,
+2. **Run.** `sc update` — fetches the Subfloor engine from its upstream remote
+   (named `super-coder` in existing forks),
    materializes it into the gitignored `.super-coder/` dir (engine = dependency,
    not fork source), pins the new upstream SHA in `.sc-state/engine.ref`
    (prior saved as `engine.ref.prev`), backs up the live DB, applies pending
@@ -36,7 +37,7 @@ you.
    maps the repo, re-snapshots the live state.
    - `sc update --no-fetch` = reconcile against the current working tree
      (offline / dev); engine + `engine.ref` unchanged.
-   - Missing-remote error -> `git remote add super-coder <url>`.
+   - Missing-remote error -> `git remote add super-coder <subfloor-url>`.
 
 3. **Verify.** `sc verify` — headless boot proof: shells, memory, granted
    skills intact + schema current. Wrong count -> `sc rollback` (below).

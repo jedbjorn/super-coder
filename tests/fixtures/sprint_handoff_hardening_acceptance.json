@@ -29,7 +29,7 @@
     {
       "gate": "Role skills cover handoff contingencies using the shipped command surface",
       "file": "tests/test_sprint_skills.py",
-      "test": "test_role_skills_cover_every_handoff_contingency_with_real_commands"
+      "test": "test_role_skills_keep_their_stateful_routes"
     }
   ]
 }

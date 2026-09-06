@@ -153,7 +153,9 @@
     ".super-coder/migrations/0251_conversation_run_transcript_offset.sql",
     ".super-coder/migrations/0252_reseed_universal_pr_owner_wakes.sql",
     ".super-coder/migrations/0253_reseed_sprint_review_flexibility.sql",
-    ".super-coder/migrations/0255_reseed_merge_gate_one_rule.sql"
+    ".super-coder/migrations/0255_reseed_merge_gate_one_rule.sql",
+    ".super-coder/migrations/0256_current_state_500.sql",
+    ".super-coder/migrations/0257_guidance_reconciliation.sql"
   ],
   "baseline_migration_ledger": {
     "count": 142,
@@ -382,7 +384,12 @@
     "tests/test_update_preflight.py",
     "tests/test_vendor_assets.py",
     "tests/test_visual_qa_distribution.py",
-    "tests/test_worktree_targets.py"
+    "tests/test_worktree_targets.py",
+    ".super-coder/assets/skills/sprint_protocol/SKILL.md",
+    ".super-coder/assets/skills/themed_markdown/SKILL.md",
+    ".super-coder/templates/shells/dev.md",
+    ".super-coder/templates/shells/planner.md",
+    "tests/test_role_aware_boot_contract.py"
   ],
   "decision": 33,
   "generation_markers": {
@@ -569,8 +576,6 @@
       ".super-coder/adapters/codex/README.md",
       ".super-coder/adapters/kimi/README.md",
       ".super-coder/api/transport.py",
-      ".super-coder/assets/skills/memory/SKILL.md",
-      ".super-coder/assets/skills/messaging/SKILL.md",
       ".super-coder/migrations/0145_reseed_generic_guidance.sql",
       ".super-coder/scripts/dispatch.sh",
       ".super-coder/scripts/live_model/__init__.py",
@@ -585,11 +590,6 @@
       "sc"
     ],
     "allowed_v2_authored_lines": {
-      ".super-coder/assets/skills/messaging/SKILL.md": [
-        "Engine-wide wakes need no Sprint. Sprint-scoped wakes deliver only while that",
-        "Sprint is armed; a producer may create delivery intent earlier and leave it",
-        "queued. Typed Sprint commands and engine producers return their durable"
-      ],
       ".super-coder/ui/app.js": [
         "\"Abort stops active work but retains the complete Sprint history and the Planner's durable abort-report request.\") : \"\",",
         "\"No Sprints yet\",",
@@ -856,6 +856,26 @@
         "./sc sprint <cmd>        authenticated Sprints v2 actions (run without a command for the full verb list)",
         "sprint)       sc_python_probe; exec \"$PY\" \"$S/sprint_cli.py\" \"$@\" ;;",
         "Memory & catalogue    mem · map · map-sql · map-schema · sql · skill · search · context · models · job · pr · sprint · token"
+      ],
+      "docs/README.md": [
+        "period, a request, or an armed Sprint. Every flavor carries the common kit —",
+        "explicit directive naming the PR, or the grant recorded when a Sprint is",
+        "Sprint work explicitly); the mechanics live here for the operator.",
+        "opens a fresh one. Sprint assignments, review requests, and verdicts are",
+        "worktree's checked-out branch, `sc sprint register-pr` in a lane, or manual",
+        "owning Developer throughout ownership, inside or outside a Sprint; outside an",
+        "armed or paused Sprint, green arrives only as red-to-green recovery. Planner",
+        "- **Coordinate mode.** Closing the Planner chat during an armed Sprint sets",
+        "### Sprint fallbacks (operator)",
+        "./sc sprint compile-report --sprint <id> --limit 50 > shared/sprints/sprint-<n>/evidence.json",
+        "# inspect, retry, or adopt post-Sprint cleanup of participant worktrees",
+        "./sc sprint cleanup-status --sprint <id>",
+        "./sc sprint cleanup --sprint <id> --key <stable-retry-key>",
+        "./sc sprint cleanup --sprint <legacy-id> --adopt-legacy --key <stable-adoption-key>",
+        "./sc sprint abort --sprint <id> --reason <reason> [--outcome <outcome>]",
+        "./sc sprint disposition-followup --sprint <id> --followup <id> --disposition accepted",
+        "./sc sprint disposition-followup --sprint <id> --followup <id> --disposition resolved --resolution-file <path>",
+        "request. The standalone `sc sprint complete` surface is likewise an"
       ]
     },
     "forbidden_pattern": "(?:\\bsprints?\\b|\\bconductor\\b|SC_SPRINT_|pr_event|watched_prs|watch-daemon|interface_(?:generations|sessions|writer_leases|input_state|idempotency_keys|recovery_observations)|planner_(?:wake_batches|wake_items|action_receipts|alerts))",

@@ -14,6 +14,7 @@ BOOT = ENGINE / "templates" / "boot.md"
 ASSET = ENGINE / "assets" / "skills" / "git" / "SKILL.md"
 RESEED = ENGINE / "migrations" / "0252_reseed_universal_pr_owner_wakes.sql"
 LATER_RESEED = ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql"
+RECONCILIATION = ENGINE / "migrations" / "0257_guidance_reconciliation.sql"
 
 sys.path.insert(0, str(ENGINE / "scripts"))
 import seed_skills  # noqa: E402
@@ -33,10 +34,12 @@ class GitSyncPolicyTest(unittest.TestCase):
         )
         self.assertIn("surface a target/identity mismatch", body)
 
-    def test_git_skill_makes_the_base_reset_executable_and_bounded(self):
-        body = " ".join(ASSET.read_text().split())
+    def test_boot_makes_the_base_reset_executable_and_bounded(self):
+        # F72: the every-session sync gate lives in boot; the git skill keeps
+        # only event procedures and points back at boot.
+        body = " ".join(BOOT.read_text().split())
         self.assertIn(
-            "Compare `git rev-parse --show-toplevel` + "
+            "compare `git rev-parse --show-toplevel` + "
             "`git branch --show-current` with ACTIVE SESSION",
             body,
         )
@@ -44,11 +47,17 @@ class GitSyncPolicyTest(unittest.TestCase):
             "`git reset --hard origin/main && git clean -fd`", body
         )
         self.assertIn("without asking", body)
-        self.assertIn("a pushed remote branch with a PR", body)
-        self.assertIn("NEVER reset or clean a feature branch / open PR", body)
+        self.assertIn("code lives on a pushed branch with a PR", body)
+        self.assertIn("NEVER to a feature branch or open PR", body)
         self.assertIn(
             "`git rev-parse HEAD` equals `git rev-parse origin/main`", body
         )
+        skill = " ".join(ASSET.read_text().split())
+        self.assertIn("VERSION CONTROL section carries the every-session rules", skill)
+        self.assertNotIn("git reset --hard origin/main && git clean -fd", skill)
+        self.assertNotIn("Co-Authored-By", skill)
+        self.assertIn("## Merging a stack", skill)
+        self.assertIn("## After a merge", skill)
 
     def test_git_reseed_is_exact_idempotent_and_preserves_local_skills(self):
         with sqlite3.connect(":memory:") as con:
@@ -72,6 +81,14 @@ class GitSyncPolicyTest(unittest.TestCase):
             later = LATER_RESEED.read_text()
             con.executescript(later)
             con.executescript(later)
+            # 0257 (F72) re-owns the git body once more; compare after it.
+            con.executescript(
+                "CREATE TABLE IF NOT EXISTS shell_skills ("
+                "shell_id INTEGER, skill_id INTEGER);"
+            )
+            final = RECONCILIATION.read_text()
+            con.executescript(final)
+            con.executescript(final)
 
             parsed = seed_skills.parse_skill(ASSET)
             actual = con.execute(

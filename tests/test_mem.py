@@ -749,7 +749,7 @@ class ApiMemTest(unittest.TestCase):
         self.run_mem("task", "done", str(tid))
         self.assertEqual(self.q("SELECT status FROM spec_tasks WHERE task_id=?", tid)[0], "done")
 
-    def test_legacy_mem_qaqc_command_uses_the_sprint_approval_surface(self):
+    def test_mem_doc_qaqc_records_pass_fail_on_the_sprint_approval_surface(self):
         self.run_mem("roadmap", "add", "feat QAQC")
         fid = self.q("SELECT feature_id FROM roadmap WHERE title='feat QAQC'")[0]
         body = self.tmp / "qaqc.md"
@@ -769,9 +769,7 @@ class ApiMemTest(unittest.TestCase):
         try:
             self.assertEqual(
                 0,
-                self.run_mem(
-                    "doc", "qaqc", str(did), "--verdict", "approved"
-                ),
+                self.run_mem("doc", "qaqc", str(did), "--verdict", "pass"),
             )
         finally:
             mem.SC_API_TOKEN = original_token
@@ -1007,19 +1005,15 @@ class ApiMemTest(unittest.TestCase):
         finally:
             self.write("DROP TRIGGER fail_atomic_spec_move")
 
-    def test_feature_move_guidance_is_seeded_for_shells(self):
-        for skill in ("db_map", "docs", "spec"):
-            with self.subTest(skill=skill):
-                content = self.q(
-                    "SELECT content FROM skills WHERE name=? AND is_deleted=0",
-                    skill,
-                )[0]
-                self.assertIn(
-                    "sc mem doc move <document_id> --feature <target_feature_id>",
-                    content,
-                )
-        docs = self.q("SELECT content FROM skills WHERE name='docs'")[0]
-        self.assertIn("Split an active era from feature history", docs)
+    def test_feature_move_guidance_is_rendered_for_shells(self):
+        # F72: the move verb lives in the planner and dev flavor bodies.
+        for flavor in ("planner", "dev"):
+            with self.subTest(flavor=flavor):
+                body = (ENGINE / "templates" / "shells" / f"{flavor}.md").read_text()
+                self.assertIn("sc mem doc move <document_id> --feature <target>", body)
+        planner = (ENGINE / "templates" / "shells" / "planner.md").read_text()
+        self.assertIn("## REVISE, FREEZE, DOCUMENT", planner)
+        self.assertIn("sc mem doc move", (ENGINE / "scripts" / "mem.py").read_text())
 
     # ── doc write vs local save — ONE shared serialization boundary ───────────
     def test_doc_write_and_snapshot_share_one_lock(self):

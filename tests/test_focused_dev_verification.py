@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 import sys
 import unittest
@@ -22,6 +21,7 @@ MIGRATIONS = (
     ENGINE / "migrations" / "0253_reseed_sprint_review_flexibility.sql",
     ENGINE / "migrations" / "0254_reseed_task_context_projection.sql",
     ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql",
+    ENGINE / "migrations" / "0257_guidance_reconciliation.sql",
 )
 sys.path.insert(0, str(ENGINE / "scripts"))
 
@@ -34,10 +34,9 @@ SHARED_HOST_BOUNDARY = "Never start a competing repository-wide suite on a share
 
 class FocusedDeveloperVerificationSourceTest(unittest.TestCase):
     def test_fresh_developer_template_carries_the_complete_boundary(self):
-        template = json.loads(
-            (ENGINE / "templates" / "shells" / "dev.json").read_text()
-        )
-        focus = template["focus"]
+        # F72: the posture lives in the dev flavor's procedure body, rendered
+        # into the system prompt after the JSON focus.
+        focus = (ENGINE / "templates" / "shells" / "dev.md").read_text()
 
         self.assertEqual(focus.count(POLICY_HEADING), 1)
         self.assertIn("every available smallest affected test target", focus)
@@ -56,25 +55,18 @@ class FocusedDeveloperVerificationSourceTest(unittest.TestCase):
     def test_role_guidance_keeps_ci_fallback_and_authority_boundaries(self):
         bodies = {
             name: (ASSETS / name / "SKILL.md").read_text()
-            for name in ("spec", "sprint_dev", "sprint_pln")
+            for name in ("sprint_dev", "sprint_pln")
         }
         bodies["dev_kit"] = (
             ENGINE / "assets" / "seed" / "skills" / "dev_kit" / "SKILL.md"
         ).read_text()
-
-        for name in ("spec", "sprint_dev"):
-            with self.subTest(skill=name):
-                normalized = " ".join(bodies[name].split())
-                self.assertIn("boot `TESTING POSTURE`", normalized)
+        # F72: the spec execution loop lives in the dev flavor body.
+        bodies["dev"] = (ENGINE / "templates" / "shells" / "dev.md").read_text()
 
         normalized = {name: " ".join(body.split()) for name, body in bodies.items()}
-        self.assertIn("available focused proof", normalized["spec"])
-        self.assertIn("observed registered-PR checks", normalized["spec"])
-        self.assertIn("pending -> wait", normalized["spec"])
-        self.assertIn("red -> fix", normalized["spec"])
-        self.assertIn("green -> review", normalized["spec"])
-        self.assertIn("optional browser skip is non-failing", normalized["spec"])
-        self.assertNotIn("runs focused/full gates", normalized["spec"])
+        self.assertIn("TESTING POSTURE", normalized["sprint_dev"])
+        self.assertIn("follows TESTING POSTURE", normalized["dev"])
+        self.assertIn("Verification", normalized["dev"])
 
         self.assertIn(
             "Register complete code even when a local gate is unavailable",
@@ -127,6 +119,10 @@ class FocusedDeveloperVerificationMigrationTest(unittest.TestCase):
                 content TEXT,
                 is_deleted INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE shell_skills (shell_id INTEGER, skill_id INTEGER);
+            CREATE TABLE flavor_skills (
+                flavor TEXT, skill_id INTEGER, PRIMARY KEY (flavor, skill_id)
+            );
             INSERT INTO shells (shell_id, flavor, system_prompt) VALUES
                 (1, 'dev', 'Builder intro\n\n## CODE CRAFT\n\nCraft body.'),
                 (2, 'dev', 'Legacy developer prompt without craft heading.'),
@@ -175,9 +171,7 @@ class FocusedDeveloperVerificationMigrationTest(unittest.TestCase):
         )
         self.assertEqual(first_prompts[2].count(POLICY_HEADING), 1)
         self.assertEqual(first_prompts[3], original_planner)
-        source_focus = json.loads(
-            (ENGINE / "templates" / "shells" / "dev.json").read_text()
-        )["focus"]
+        source_focus = (ENGINE / "templates" / "shells" / "dev.md").read_text()
         source_policy = self._testing_posture(source_focus)
         self.assertEqual(self._testing_posture(first_prompts[1]), source_policy)
         self.assertEqual(self._testing_posture(first_prompts[2]), source_policy)

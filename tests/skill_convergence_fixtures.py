@@ -50,6 +50,18 @@ TOMBSTONE_SKILLS = (
     "test_authoring_sqlite",
     "windows_devkit",
     "windows_vm_gui",
+    "memory",
+    "db_map",
+    "bootstrap",
+    "surface_catalogue",
+    "messaging",
+    "flags",
+    "spec",
+    "review",
+    "docs",
+    "admin_git",
+    "cartographer",
+    "sprint_close",
 )
 LOCAL_SKILL_NAME = "dos_arch_testing"
 LOCAL_SKILL_DESCRIPTION = "Fork-owned dos-arch testing procedure"

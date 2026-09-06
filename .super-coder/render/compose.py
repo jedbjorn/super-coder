@@ -25,7 +25,8 @@ TEMPLATE_PATH = ENGINE / "templates" / "boot.md"
 MAP_DISCREPANCY_BLOCK = (
     "**If the map is wrong, report it — you don't map.** Surface the gap to "
     "the FnB. Open any blocking map-quality flag first; retain its numeric ID "
-    "+ display name. Then send one `messaging` notice to `cartographer`:\n\n"
+    "+ display name. Then send one notice to `cartographer` "
+    "(`sc mem message send cartographer \"…\"`):\n\n"
     "```text\n"
     "shape: <what is wrong> — paths: <region/>; ref: <feature/doc/PR>\n"
     "flags: <numeric_id>=<SC-name>[, <numeric_id>=<SC-name>] | none\n"
@@ -75,7 +76,7 @@ PROJECT_VS_ENGINE_SOURCE = (
     "   tree** — `git show origin/main:<path>`. A stale checkout answers\n"
     "   confidently, and a command that reads it inherits the staleness.\n"
     "3. **Pull after every merge; reconcile before restarting.** A restart\n"
-    "   kills live sessions, so the FnB owns that boundary.\n"
+    "   kills live sessions, so the operator owns that boundary.\n"
     "4. **Tracked engine source is your work surface; live instance state is\n"
     "   Admin-maintained.** Author source changes on a branch and use the named\n"
     "   maintenance procedure for any live-state cutover.\n"
@@ -402,9 +403,9 @@ def render_connections(con) -> str:
 
     `con` is the MAP DB (.sc-state/map.db), or None when the repo isn't mapped
     yet — then only the standing pointer renders."""
-    lines = ["**Need to find something?** The `dr_*` map (the `surface_catalogue` "
-             "skill) is abbreviated source documentation — one option beside grep, "
-             "direct reads, and repository docs."]
+    lines = ["**Need to find something?** The `dr_*` map (`sc map-schema` for "
+             "structure, `sc map-sql` for data) is abbreviated source documentation "
+             "— one option beside grep, direct reads, and repository docs."]
     if con is None:
         return "\n".join(lines + ["", "_Repo not mapped yet — the cartographer maps it._"])
     repo = con.execute(
@@ -482,9 +483,7 @@ def render_api(port: "int | None", api_key: "str | None") -> str:
         )
     return (
         f"- **Base URL:** `http://127.0.0.1:{port}`\n\n"
-        "Write memory via `sc mem` — it is already wired to this launched shell; the engine "
-        "resolves API identity for you. "
-        "Read messages: `GET /_sc/mem/messages`. Command reference: the `memory` and `db_map` skills."
+        "Write through `sc mem`; it is already wired to this launched shell."
     )
 
 
@@ -670,19 +669,23 @@ def compose_boot(con: sqlite3.Connection, shell, user, session_id: str,
     if not bootstrapped:
         if flavor == "cartographer":
             prompt = (
-                "You own the repo map and haven't completed setup. Run the "
-                "**cartographer** skill now: inspect with `sc map-schema`, "
-                "configure the local map, wire hooks with `sc map-setup`, install "
-                "worktree-authored extractors through `sc map-extractor install`, "
-                "and act on every `sc map finalize` row. Pass = finalization exits "
-                "0 before you mark yourself oriented.")
+                "You own the repo map and haven't completed setup. Run FIRST "
+                "BOOT AND HEAL from your system prompt now: inspect with "
+                "`sc map-schema`, configure the local map, wire hooks with "
+                "`sc map-setup`, install worktree-authored extractors through "
+                "`sc map-extractor install`, and act on every `sc map finalize` "
+                "row. Pass = finalization exits 0; then `sc mem state \"…\"` and "
+                "`sc mem oriented`.")
         else:
             prompt = (
-                "You have not oriented in this repo yet. Run the **bootstrap** "
-                "skill now — read the repo map + your identity, set your "
-                "`current_state`, and mark yourself oriented. (You don't map the "
-                "repo — the cartographer keeps the map fresh for you.) Do this "
-                "before other work.")
+                "You have not oriented in this repo yet. Before other work: "
+                "(1) read the repo — the CONNECTIONS sections below, one query "
+                "deep with `sc map-sql` where you need it (you don't map; the "
+                "cartographer keeps the map fresh); (2) read yourself — seed, "
+                "mandate, and role above; (3) skim the plan — `sc mem get roadmap` "
+                "and `sc mem get flags`; (4) replace the install placeholder with "
+                "`sc mem state \"…\"`, then mark yourself oriented with "
+                "`sc mem oriented`.")
         first_run = ["## FIRST RUN", "", prompt, "", "---", ""]
 
     active_session = [
@@ -740,7 +743,7 @@ def compose_boot(con: sqlite3.Connection, shell, user, session_id: str,
         f"- **Seed:** {counts['seed']}",
         f"- **L&S:** {render_lns_status(counts)}",
         f"- **Flags:** {counts['flags']} open",
-        f"- **Inbox:** {counts['unread']} unread — `--message check` to surface.",
+        f"- **Inbox:** {counts['unread']} unread — `sc mem message check` to surface.",
         f"- **Repo map:** {map_status}",
         f"- **Docs:** {docs_status}",
         "",

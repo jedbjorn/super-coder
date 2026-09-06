@@ -5,8 +5,10 @@ from __future__ import annotations
 import importlib
 import sqlite3
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / ".super-coder"
@@ -95,6 +97,8 @@ class BoundaryRenderingTest(unittest.TestCase):
 
 class StandardPromptRefreshTest(unittest.TestCase):
     def setUp(self) -> None:
+        self.tmp_overlays = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp_overlays.cleanup)
         self.con = sqlite3.connect(":memory:")
         self.con.execute(
             "CREATE TABLE shells ("
@@ -127,7 +131,13 @@ class StandardPromptRefreshTest(unittest.TestCase):
 
         self.assertEqual(standard[0], "Custom Dev Role")
         self.assertEqual(standard[1], "Preserve this mandate")
-        self.assertIn("## CONTROL-PLANE MEMORY", standard[2])
+        # The flavor procedure body renders into the prompt (F72: boot-first
+        # placement); the retired CONTROL-PLANE MEMORY block moved to boot.
+        self.assertIn("## SPEC EXECUTION", standard[2])
+        self.assertIn("## TESTING POSTURE", standard[2])
+        self.assertIn("## MANDATE", standard[2])
+        self.assertNotIn("## CONTROL-PLANE MEMORY", standard[2])
+        self.assertNotIn("{{", standard[2])
         self.assertIn("Preserve this mandate", standard[2])
         for text in WORKER_FORBIDDEN:
             self.assertNotIn(text, standard[2])
@@ -136,6 +146,37 @@ class StandardPromptRefreshTest(unittest.TestCase):
             shell_factory.refresh_standard_prompts(self.con, repo="sample-app"),
             0,
         )
+
+    def test_fork_focus_overlay_keeps_engine_procedure(self):
+        overlays = Path(self.tmp_overlays.name)
+        (overlays / "dev.json").write_text('{"focus": "Fork-specific focus."}')
+        with mock.patch.object(shell_factory, "FORK_FLAVOR_OVERLAYS", overlays):
+            tpl = shell_factory.load_flavor("dev")
+            prompt = shell_factory.render_prompt(
+                "Dev One", tpl["role"], "sample-app", tpl["focus"],
+                tpl["mandate"], shell_factory.load_procedure("dev"),
+            )
+        self.assertIn("Fork-specific focus.", prompt)
+        self.assertIn("## SPEC EXECUTION", prompt)
+        self.assertIn("## CODE CRAFT", prompt)
+        self.assertEqual(shell_factory.load_procedure(None), "")
+        bespoke = shell_factory.render_prompt(
+            "B", "Bespoke shell", "sample-app", "focus", "mandate", ""
+        )
+        self.assertNotIn("{{", bespoke)
+        self.assertNotIn("\n\n\n", bespoke)
+
+    def test_every_standard_flavor_has_a_procedure_body(self):
+        for flavor in ("dev", "reviewer", "planner", "admin", "cartographer", "devops"):
+            with self.subTest(flavor=flavor):
+                body = shell_factory.load_procedure(flavor)
+                self.assertTrue(body.startswith("## "), flavor)
+        # Worker flavors never see engine internals; admin and cartographer own
+        # snapshot/source-repository terms by mandate.
+        for flavor in ("dev", "reviewer", "planner", "devops"):
+            body = shell_factory.load_procedure(flavor)
+            for text in WORKER_FORBIDDEN:
+                self.assertNotIn(text, body, flavor)
 
     def test_planner_and_reviewer_prompts_use_proportionate_judgment(self):
         planner = shell_factory.load_flavor("planner")
@@ -187,7 +228,17 @@ class AdaptivePostureMigrationTest(unittest.TestCase):
         )
 
         con.executescript(
+            "CREATE TABLE shell_skills (shell_id INTEGER, skill_id INTEGER);"
+            "CREATE TABLE flavor_skills (flavor TEXT, skill_id INTEGER, "
+            "PRIMARY KEY (flavor, skill_id));"
+        )
+        con.executescript(
             (ENGINE / "migrations" / "0246_adaptive_shell_posture.sql").read_text()
+        )
+        # F72: the review skill 0246 reseeded is retired by the trailing
+        # reconciliation; mandates still converge and custom rows stay intact.
+        con.executescript(
+            (ENGINE / "migrations" / "0257_guidance_reconciliation.sql").read_text()
         )
 
         planner = con.execute(
@@ -199,10 +250,7 @@ class AdaptivePostureMigrationTest(unittest.TestCase):
         custom = con.execute(
             "SELECT mandate,system_prompt FROM shells WHERE shell_id=3"
         ).fetchone()
-        review = con.execute(
-            "SELECT description,category,command,common,content,is_deleted "
-            "FROM skills WHERE name='review'"
-        ).fetchone()
+        review = con.execute("SELECT 1 FROM skills WHERE name='review'").fetchone()
         con.close()
 
         self.assertIn("materially affect what should be built", planner[0])
@@ -210,45 +258,32 @@ class AdaptivePostureMigrationTest(unittest.TestCase):
         self.assertIn("Verify consequential claims", reviewer[0])
         self.assertNotIn("Adversarial by default", reviewer[1])
         self.assertEqual(custom, ("Custom planning mandate", "custom prompt"))
-        expected_review = seed_skills.parse_skill(
-            ENGINE / "assets" / "skills" / "review" / "SKILL.md"
-        )
-        self.assertEqual(
-            review,
-            (
-                expected_review["description"],
-                expected_review["category"],
-                expected_review["command"],
-                expected_review["common"],
-                expected_review["content"],
-                0,
-            ),
-        )
+        self.assertIsNone(review)
 
 
 class SkillSplitTest(unittest.TestCase):
-    def test_review_skill_uses_material_lenses_not_forced_exhaustiveness(self):
-        body = (ENGINE / "assets" / "skills" / "review" / "SKILL.md").read_text()
+    def test_reviewer_body_uses_material_lenses_not_forced_exhaustiveness(self):
+        body = (ENGINE / "templates" / "shells" / "reviewer.md").read_text()
 
         self.assertIn("Review what matters for this change", body)
-        self.assertIn("do not manufacture\ncoverage to complete a checklist", body)
+        self.assertIn("Do not manufacture coverage to\n   complete a checklist", body)
         self.assertIn("Match skepticism to the work", body)
         self.assertNotIn("Apply every axis on every review", body)
         self.assertNotIn("Adversarial by default", body)
+        self.assertNotIn("different model family", body)
 
     def test_common_guidance_is_api_only_and_admin_skill_owns_internals(self):
-        for name in (
-            "cartographer",
-            "db_map",
-            "docs",
-            "fork_skill_design",
-            "git",
-            "memory",
-            "messaging",
-            "onboard",
-            "surface_catalogue",
-        ):
-            body = (ENGINE / "assets" / "skills" / name / "SKILL.md").read_text()
+        bodies = {
+            name: (ENGINE / "assets" / "skills" / name / "SKILL.md").read_text()
+            for name in (
+                "curate", "fork_skill_design", "git", "issue_reporting", "onboard",
+                "sprint_protocol", "themed_markdown", "web_search",
+            )
+        }
+        for flavor in ("dev", "reviewer", "planner", "devops"):
+            bodies[f"{flavor}.md"] = shell_factory.load_procedure(flavor)
+        bodies["boot.md"] = compose.TEMPLATE_PATH.read_text()
+        for name, body in bodies.items():
             with self.subTest(skill=name):
                 self.assertNotIn("shell_db.db", body)
                 self.assertNotIn("SC_ROOT", body)

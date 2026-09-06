@@ -7,7 +7,7 @@ common: false
 
 # git_cleanup — the act pass over git state
 
-`git_hygiene.py` reads; this acts on its report. **Admin shell only** — the one vantage at the repo root on `main`, seeing every worktree, exempt from the branch-guard. A working shell NEVER runs this; it tidies only its own worktree via the `git` skill.
+`git_hygiene.py` reads; this acts on its report. **Admin shell only** — the one vantage at the repo root on `main`, seeing every worktree, exempt from the branch-guard. A working shell NEVER runs this; it tidies only its own worktree.
 
 Governing asymmetry: a MERGED PR = proof a branch is safe to delete; uncommitted work has NO proof it is disposable. Delete only on evidence; preserve by default; discard only on the FnB's explicit per-item OK. Unsure -> surface, never guess destructively.
 
@@ -59,7 +59,7 @@ NEVER auto-delete: a `merged: null` branch, an `is_base` branch (`main` or any `
 ### Tier B — outstanding work (propose -> FnB OK -> act). Preserve, never discard.
 
 - Unpushed commits (`ahead > 0`): show the FnB `git -C <path> log origin/<base>..HEAD --oneline` first -> propose push + PR.
-- Admin's OWN root tree dirty: show the diff + proposed message -> on OK, cut a feature branch off main, commit, push, PR (the ordinary `git` skill flow). NEVER discard the admin tree's dirt without explicit instruction.
+- Admin's OWN root tree dirty: show the diff + proposed message -> on OK, cut a feature branch off main, commit, push, PR. NEVER discard the admin tree's dirt without explicit instruction.
 
 ### Tier C — other shells' dirty worktrees (gated; preserve-only)
 
@@ -69,23 +69,20 @@ Any other shell's worktree: `is_main: false` + `dirty > 0`.
    - `safe_to_clean_all: true` -> every worktree dormant -> act on all.
    - shortname in `active_other_shells` -> that shell is LIVE -> surface only, do NOT touch its tree. The others remain safe.
    - `indeterminate > 0` -> a harness process whose cwd was unreadable (another OS user, say) -> do NOT assume all-clear -> surface.
-2. **Attribution.** The commit carries THAT shell's trailer, never the admin's. Map the branch `shell/<shortname>` -> shell:
+2. **Attribution.** The commit carries THAT shell's trailer, never the admin's. Read the display name for `shell/<shortname>` from `sc mem get shells`, then export the identity on the commit so the tracked `prepare-commit-msg` hook writes the trailer for you:
    ```bash
-   sc sql \
-     "SELECT display_name FROM shells WHERE shortname='<shortname>' AND is_deleted=0;"
+   SC_SHELL_NAME="<display_name>" SC_SHELL_SHORTNAME="<SHORTNAME>" git -C $WT commit -m "<msg>"
    ```
-   Trailer: `Co-Authored-By: <display_name> (super-coder) <noreply@…>`.
 3. **Preserve** (shell cleared as not live):
    ```bash
    WT=.sc-worktrees/<shortname>
    git -C $WT checkout -b <type>/<short-desc>           # feature branch off its HEAD
-   git -C $WT add -A && git -C $WT commit -m "<msg>
-
-   Co-Authored-By: <display_name> (super-coder) <noreply@…>"
+   git -C $WT add -A
+   SC_SHELL_NAME="<display_name>" SC_SHELL_SHORTNAME="<SHORTNAME>" git -C $WT commit -m "<msg>"
    git -C $WT push -u origin <type>/<short-desc>
    gh pr create --repo <owner/repo> --head <type>/<short-desc> --fill   # open, never merge
    ```
-4. **Message the owning shell** — it must never boot to a silently rearranged tree (see the `messaging` skill):
+4. **Message the owning shell** — it must never boot to a silently rearranged tree:
    ```bash
    sc mem message send <shortname> 'git_cleanup: your worktree had uncommitted work. I preserved it on branch `<type>/<short-desc>` and opened PR #<n>. Your tree now sits on that branch — `git checkout shell/<shortname>` to return to your base.'
    ```
@@ -96,7 +93,7 @@ Any other shell's worktree: `is_main: false` + `dirty > 0`.
 - NEVER `git checkout -- `, `git reset --hard`, `git clean`, or `git stash drop` on uncommitted work without the FnB's explicit per-item OK — preserve is reversible, discard is not.
 - NEVER commit another shell's work under the admin's attribution.
 - NEVER act on a worktree whose shell may be live — surface instead.
-- NEVER merge a PR — opening is the default; merging is the FnB's gate (see the `git` skill).
+- NEVER merge a PR — opening is the default; merging is the FnB's gate.
 - NEVER delete a branch carrying unmerged, un-PR'd work — no PR = lost work.
 - NEVER touch the engine — `.super-coder/` is a gitignored materialized dependency, not your code.
 

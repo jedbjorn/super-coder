@@ -65,7 +65,7 @@ Run from the repo root, like every engine command:
     ./sc mem doc edit <document_id>  [--title "…"] [--body-file PATH] [--render-path …]   # frozen: --render-path only
     ./sc mem doc move <document_id>  --feature <target_feature_id>   # unfrozen spec + plan, atomic
     ./sc mem doc freeze <document_id>
-    ./sc mem doc qaqc <spec_document_id> --verdict approved|changes_requested [--findings-doc ID]
+    ./sc mem doc qaqc <spec_document_id> --verdict pass|fail [--findings-doc ID]   # Reviewer signs the spec's current body
     ./sc mem narrative "<line>"
     ./sc mem delivery-audit          [--json]      # Planner-only bounded delivery reconciliation
     ./sc mem message check [N]                         # your unread inbox (read-only)
@@ -847,12 +847,7 @@ def cmd_doc(args) -> int:
         )
         return _note_serialize(r) or rc
     if args.doc_cmd == "qaqc":
-        payload = {
-            "document_id": args.document_id,
-            "verdict": (
-                "pass" if args.verdict == "approved" else "fail"
-            ),
-        }
+        payload = {"document_id": args.document_id, "verdict": args.verdict}
         if args.findings_doc is not None:
             payload["findings_document_id"] = args.findings_doc
         review = _api(
@@ -1160,11 +1155,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="record an append-only review of the spec's current canonical body",
     )
     dq.add_argument("document_id", type=int)
-    dq.add_argument(
-        "--verdict",
-        required=True,
-        choices=("approved", "changes_requested"),
-    )
+    dq.add_argument("--verdict", required=True, choices=("pass", "fail"))
     dq.add_argument("--findings-doc", dest="findings_doc", type=int)
     sp.set_defaults(fn=cmd_doc)
 

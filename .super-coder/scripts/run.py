@@ -2027,6 +2027,8 @@ def prepare_launch(*, shell_id: int, harness: "str | None" = None,
     env["SC_API_BASE"] = f"http://127.0.0.1:{api_port}" if api_port else ""
     env["SC_SHELL_ID"] = str(chosen["shell_id"])
     env["SC_SHELL_SHORTNAME"] = chosen["shortname"]
+    # hooks/prepare-commit-msg reads both to append the shell's commit trailer.
+    env["SC_SHELL_NAME"] = full["display_name"] or ""
     env["SC_HARNESS"] = harness
     env["SC_SHELL_WORKTREE"] = str(work_dir)
     if not shell_view.restricted:
@@ -2635,6 +2637,8 @@ def main() -> None:
     # harness surface.  Never consume an inherited/deleted shell identity.
     env["SC_SHELL_ID"] = str(chosen["shell_id"])
     env["SC_SHELL_SHORTNAME"] = chosen["shortname"]
+    # hooks/prepare-commit-msg reads both to append the shell's commit trailer.
+    env["SC_SHELL_NAME"] = full["display_name"] or ""
     env["SC_API_TOKEN"] = full["api_key"] or ""
     env["SC_API_BASE"] = f"http://127.0.0.1:{api_port}" if api_port else ""
     # Admin keeps the engine-path fast path for maintenance hooks. Restricted

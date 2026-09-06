@@ -688,30 +688,33 @@ class GuidanceTest(unittest.TestCase):
         self.assertIn("abbreviated source documentation", header)
 
     def test_developer_prompt_and_role_skills_carry_the_command(self):
+        # F72: the spec execution loop lives in the dev flavor's procedure body.
         dev = json.loads((ENGINE / "templates" / "shells" / "dev.json").read_text())
-        self.assertIn("sc context --task <id>", dev["focus"])
         self.assertNotIn("don't grep blind", dev["focus"])
-        spec = self.skill("spec")
-        self.assertIn("sc context --task <task_id>", spec)
-        self.assertLess(spec.index("sc context --task <task_id>"),
-                        spec.index("sc mem get documents --doc <doc_id>"))
-        self.assertIn("only for an unresolved need", spec)
+        body = (ENGINE / "templates" / "shells" / "dev.md").read_text()
+        self.assertIn("sc context --task <id>", body)
+        self.assertLess(body.index("sc context --task <id>"),
+                        body.index("sc mem get documents --doc <doc_id>"))
+        self.assertIn("only for an unresolved need", body)
         dev_skill = self.skill("sprint_dev")
         self.assertIn("sc context --work-unit <id>", dev_skill)
         self.assertIn("default planning context", dev_skill)
 
-    def test_surface_catalogue_is_a_resource_not_a_mandate(self):
-        text = self.skill("surface_catalogue")
+    def test_boot_orientation_is_a_resource_not_a_mandate(self):
+        # F72: the surface_catalogue skill folded into boot ORIENTATION.
+        text = (ENGINE / "templates" / "boot.md").read_text()
         for gone in ("Map first, grep second", "NEVER `grep -r`", "BEFORE grepping",
                      "Query it first"):
             self.assertNotIn(gone, text)
         self.assertIn("not a mandate", text)
         self.assertIn("sc map-schema", text)
         self.assertIn("sc map-sql", text)
-        self.assertIn("keep\n  working with another method", text)
+        self.assertIn("Keep working from what the map does show", compose.MAP_DISCREPANCY_BLOCK)
 
     def test_cartographer_description_standard_is_behavioral_and_incremental(self):
-        text = " ".join(self.skill("cartographer").split())
+        text = " ".join(
+            (ENGINE / "templates" / "shells" / "cartographer.md").read_text().split()
+        )
         for needed in ("responsibility the file owns", "mechanism it uses",
                        "principal input", "observable output", "200-character",
                        "| Test | the contract, boundary, or failure mode it proves |",
@@ -732,22 +735,29 @@ class GuidanceTest(unittest.TestCase):
         con.executescript(
             "CREATE TABLE skills (skill_id INTEGER PRIMARY KEY, name TEXT UNIQUE, "
             "description TEXT, category TEXT, command TEXT, common INTEGER, "
-            "content TEXT, is_deleted INTEGER DEFAULT 0);")
+            "content TEXT, is_deleted INTEGER DEFAULT 0);"
+            "CREATE TABLE shell_skills (shell_id INTEGER, skill_id INTEGER);"
+            "CREATE TABLE flavor_skills (flavor TEXT, skill_id INTEGER, "
+            "PRIMARY KEY(flavor, skill_id));")
         con.executescript(path.read_text())
         con.executescript(path.read_text())          # idempotent
-        # 0255 re-owns sprint_dev after this reseed; compare once it replayed.
-        later = ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql"
-        con.executescript(later.read_text())
-        con.executescript(later.read_text())
-        for name in ("cartographer", "spec", "sprint_dev", "surface_catalogue"):
-            parsed = seed_skills.parse_skill(ENGINE / "assets" / "skills" / name / "SKILL.md")
-            row = con.execute(
-                "SELECT description,category,command,common,content,is_deleted "
-                "FROM skills WHERE name=?", (name,)).fetchone()
-            self.assertEqual(tuple(row), (parsed["description"], parsed["category"],
-                                          parsed["command"], parsed["common"],
-                                          parsed["content"], 0), name)
-        self.assertEqual(con.execute("SELECT COUNT(*) FROM skills").fetchone()[0], 7)
+        # 0255 then 0257 (F72) re-own sprint_dev; compare once both replayed.
+        for later in ("0255_reseed_merge_gate_one_rule.sql",
+                      "0257_guidance_reconciliation.sql"):
+            text = (ENGINE / "migrations" / later).read_text()
+            con.executescript(text)
+            con.executescript(text)
+        parsed = seed_skills.parse_skill(ENGINE / "assets" / "skills" / "sprint_dev" / "SKILL.md")
+        row = con.execute(
+            "SELECT description,category,command,common,content,is_deleted "
+            "FROM skills WHERE name='sprint_dev'").fetchone()
+        self.assertEqual(tuple(row), (parsed["description"], parsed["category"],
+                                      parsed["command"], parsed["common"],
+                                      parsed["content"], 0))
+        # The three retired names 0254 seeded are gone after reconciliation.
+        for gone in ("cartographer", "spec", "surface_catalogue"):
+            self.assertIsNone(con.execute(
+                "SELECT 1 FROM skills WHERE name=?", (gone,)).fetchone(), gone)
 
 
 if __name__ == "__main__":

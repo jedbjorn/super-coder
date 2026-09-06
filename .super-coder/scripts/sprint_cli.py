@@ -64,20 +64,6 @@ def cmd_declare(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_record_qaqc(args: argparse.Namespace) -> int:
-    result = _post(
-        "/_sc/sprint/qaqc",
-        {
-            "document_id": args.document,
-            "verdict": args.verdict,
-            "findings_document_id": args.findings_document,
-        },
-        idempotent=True,
-    )
-    print(json.dumps(result, indent=2, sort_keys=True))
-    return 0
-
-
 def cmd_plan_unit(args: argparse.Namespace) -> int:
     result = _post(
         "/_sc/sprint/plan-unit",
@@ -520,14 +506,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
-
-    qaqc = sub.add_parser(
-        "record-qaqc", help="Review shell signs the current exact spec revision"
-    )
-    qaqc.add_argument("--document", type=int, required=True)
-    qaqc.add_argument("--verdict", choices=("pass", "fail"), required=True)
-    qaqc.add_argument("--findings-document", type=int)
-    qaqc.set_defaults(fn=cmd_record_qaqc)
 
     declare = sub.add_parser(
         "declare", help="Planner creates one editable prepared Sprint envelope"

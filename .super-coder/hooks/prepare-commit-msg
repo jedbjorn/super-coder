@@ -1,0 +1,18 @@
+#!/bin/sh
+# Subfloor prepare-commit-msg — attribute the commit to the launched shell.
+#
+# Fires for every harness via core.hooksPath. The launcher exports the booted
+# shell's identity (SC_SHELL_NAME + SC_SHELL_SHORTNAME); when both are present
+# the hook appends exactly one
+#   Co-Authored-By: <display_name> <shortname@subfloor.local>
+# trailer to the message being prepared. Absent variables (a bare operator, a
+# CI runner) mean no trailer. Idempotent through `git interpret-trailers`
+# (addIfDifferent), so an amend or a message that already carries the trailer
+# never gains a second copy. Best-effort: this hook never blocks a commit.
+msg_file="$1"
+[ -n "$msg_file" ] || exit 0
+[ -n "${SC_SHELL_NAME:-}" ] && [ -n "${SC_SHELL_SHORTNAME:-}" ] || exit 0
+trailer="Co-Authored-By: ${SC_SHELL_NAME} <${SC_SHELL_SHORTNAME}@subfloor.local>"
+git interpret-trailers --in-place --if-exists addIfDifferent \
+  --trailer "$trailer" "$msg_file" 2>/dev/null || true
+exit 0

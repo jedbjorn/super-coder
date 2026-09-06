@@ -7,14 +7,9 @@ common: false
 
 # sprint_prep — declare the riverbed
 
-Use as the owning Planner while a Sprint is `prepared`. Preparation ends at one
-atomic arming decision; it does not launch participants piecemeal.
-
-Use the simplest path supported by current durable state. Treat authority,
-lifecycle preconditions, durable writes, and typed handoffs as hard boundaries;
-use judgment for planning and evidence gathering within them. Repeat a read only
-when later activity could have changed it or the final command requires live
-revalidation.
+Load `sprint_protocol` first. Use this as the owning Planner while a Sprint is
+`prepared`. Preparation ends at one atomic arming decision; it does not launch
+participants piecemeal.
 
 ## Outcome
 
@@ -32,19 +27,12 @@ Produce one editable prepared Sprint with:
 - a capacity plan sized to justified parallel work and review demand, with the
   local/GitHub capacity to execute it.
 
-Prepared routes are intent-only: declaration and prepared reroute write no
-binding, catalogue generation, or digest. Preview every participant with
+Preview every participant with
 `sc models resolve <harness> [<model>] [--effort <level>]`; omit `--effort` for
 Vibe and Harness default. Pass = each controlled preview names the requested
 Thinking level and each uncontrolled preview returns explicit `effort: null`.
-Defaults satisfy the gate only as prepared intent; arm must still resolve and
-bind them.
-
-Arm resolves every intent against one fresh catalogue generation, creates
-immutable route revision 1 for every participant, records the armed transition,
-publishes the initial assignments, and declares a New Planner wake in one
-transaction. Any mismatch rolls back every binding, wake, and lifecycle write.
-Participant chats later consume only the active stored binding.
+Arm binds every route, records the armed transition, and publishes the first
+assignments in one transaction; any mismatch rolls the whole arm back.
 
 ## Eligibility pass
 
@@ -53,24 +41,18 @@ shell roster, model routes, quota state, repository access, and worktree
 availability. Record the exact revision hash you inspected; a title or document
 id is not a revision.
 
-The FnB decides whether pre-Sprint QA/QC is useful. If requested, the Review
-shell records its verdict against the current exact body through the
-authenticated Sprint surface:
+The FnB decides whether pre-Sprint QA/QC is useful. If requested, ask the
+Review shell through ordinary inbox mail (no Sprint relay exists yet); it
+signs the current exact body with:
 
 ```text
-sc sprint record-qaqc --document <spec-document-id> --verdict pass \
-  [--findings-document <document-id>]
+sc mem doc qaqc <spec-document-id> --verdict pass|fail [--findings-doc <document-id>]
 ```
 
 The record is inspectable evidence, not launch authorization. Its absence,
 verdict, findings, revision age, or signer state never blocks declaration or
-arming. A body edit makes the prior record historical evidence; it does not
-change the exact revision the Planner later binds.
-
-When the FnB requests pre-Sprint QA/QC, contact the Review shell through the
-ordinary shell-to-shell channel because no Sprint relay or inbox exists yet.
-Proceed with preparation regardless of whether review was performed or what it
-found; after arming, switch to `sprint_pln`.
+arming. A body edit makes the prior record historical evidence. Proceed with
+preparation regardless of whether review was performed or what it found.
 
 Refuse arming when any of these is true:
 
@@ -157,8 +139,7 @@ revision do not affect eligibility and direct `--spec` is canonical.
 The participant file contains `shell_id`, `role`, and `harness`, with optional
 nullable `model`, Thinking level (`effort`), and `route`. FnB may add
 `--planner-shell <id>` when declaring for the originating Planner. Keep the
-Sprint prepared while shaping the plan. Prepared reroute returns
-`binding_status=unbound-intent`; it must not create route history.
+Sprint prepared while shaping the plan.
 
 ## Final arming check
 
@@ -166,10 +147,7 @@ Immediately before arming, select exactly one participating Reviewer as the
 whole-Sprint conformance owner. Then re-read the exact spec revision hashes,
 available QA/QC evidence, task coverage, participant routes and capacity,
 single-armed invariant, repository access, prior-Sprint cleanup state, and
-merge grant.
-Review evidence is summarized, never interpreted as authorization. The final
-read and durable plan commit belong to the authoritative arming transaction;
-external harness and GitHub work occurs after it commits.
+merge grant. Review evidence is summarized, never interpreted as authorization.
 
 If arming reports an unresolved cleanup target, inspect it once and act on its
 named recovery instead of manually changing that worktree:
@@ -181,12 +159,6 @@ sc sprint cleanup --sprint <prior-sprint-id> --key <stable-retry-key>
 
 Only the originating Planner or FnB retries a failed scheduled cleanup. Only
 FnB may add `--adopt-legacy` for one completed Sprint that predates scheduling.
-Successful retry writes return cleanup to `pending`; native runtime and launch
-preflight own execution.
-
-Arming succeeds only when the first assignments and wake intents are durable.
-A process crash after commit is outbox recovery; a crash before commit exposes
-no partial Sprint.
 
 ```text
 sc sprint arm --sprint <id> --conformance-reviewer-shell <shell-id>
@@ -194,20 +166,18 @@ sc sprint arm --sprint <id> --conformance-reviewer-shell <shell-id>
 
 Require the receipt to identify the selected owner and one revision-1 binding
 for every participant. After `arm` succeeds, participant pickup belongs to
-native delivery. The armed
-runtime dispatches ready work and wake recovery reconciles unread pickup; the
-preparing Planner does not manually boot participants or create a second wake
-path. Initial assignments use Force-new delivery; a live turn reaches its
-natural boundary before delivery and the runtime owns rotation and recovery.
+native delivery: the armed runtime dispatches ready work and wake recovery
+reconciles unread pickup. Do not boot participants or create a second wake
+path.
 
 ## Handoff
 
 Once armed, hand control to `sprint_pln` and stop preparation work. Give the FnB
-a compact declaration:
-Sprint id, feature, exact spec revisions, participants/routes, work-unit graph,
-planned waves, capacity rationale and reserve, merge-grant state, and known
-accepted risks. State whether pre-Sprint QA/QC was performed and summarize any
-available evidence without treating it as an eligibility result.
+a compact declaration: Sprint id, feature, exact spec revisions,
+participants/routes, work-unit graph, planned waves, capacity rationale and
+reserve, merge-grant state, and known accepted risks. State whether pre-Sprint
+QA/QC was performed and summarize any available evidence without treating it
+as an eligibility result.
 
 Stop when the Sprint is armed or when one concrete eligibility blocker has been
 surfaced. Do not dispatch from a partially prepared plan.

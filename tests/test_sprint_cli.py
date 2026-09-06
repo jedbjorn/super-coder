@@ -53,7 +53,7 @@ class SprintCliDispatcherTest(unittest.TestCase):
 
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("Authenticated Sprints v2 actions", completed.stdout)
-        self.assertIn("record-qaqc", completed.stdout)
+        self.assertNotIn("record-qaqc", completed.stdout)
         self.assertIn("compile-report", completed.stdout)
         self.assertIn("watcher-state", completed.stdout)
         self.assertIn("reconcile-pr", completed.stdout)
@@ -2082,23 +2082,22 @@ class SprintCliApiTest(unittest.TestCase):
         finally:
             con.close()
 
-        approval = self.run_cli(
-            TOKENS["reviewer"],
-            "record-qaqc",
-            "--document",
-            str(document_id),
-            "--verdict",
-            "pass",
+        # QA/QC has one write form: `sc mem doc qaqc … --verdict pass|fail`.
+        mem.SC_API_TOKEN = TOKENS["reviewer"]
+        approval = mem._api(
+            "POST",
+            "/_sc/sprint/qaqc",
+            {"document_id": document_id, "verdict": "pass"},
+            idempotent=True,
         )
         self.assertTrue(approval["created"])
+        mem.SC_API_TOKEN = TOKENS["developer"]
         with self.assertRaisesRegex(SystemExit, "HTTP 403.*Review shell"):
-            self.run_cli(
-                TOKENS["developer"],
-                "record-qaqc",
-                "--document",
-                str(document_id),
-                "--verdict",
-                "pass",
+            mem._api(
+                "POST",
+                "/_sc/sprint/qaqc",
+                {"document_id": document_id, "verdict": "pass"},
+                idempotent=True,
             )
 
         participants = self.write(

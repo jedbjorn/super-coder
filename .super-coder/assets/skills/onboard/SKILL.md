@@ -1,13 +1,13 @@
 ---
 name: onboard
-description: One-time, FnB-supervised ingest of a repo's EXISTING docs/specs into the DB + roadmap backfill — the only time content flows file→DB. Run once after bootstrap on a fork with existing documentation. Planning shell's job.
+description: One-time, FnB-supervised ingest of a repo's EXISTING docs/specs into the DB + roadmap backfill — the only time content flows file→DB. Run once after first-run orientation on a fork with existing documentation. Planning shell's job.
 category: substrate
 common: false
 ---
 
 # onboard — ingest the repo's existing docs (once, with the FnB)
 
-Run once, after `bootstrap`, on a fork that has existing documentation —
+Run once, after first-run orientation, on a fork that has existing documentation —
 FnB-supervised. Brings the repo's *existing* docs into the DB so the GUI shows
 real content and the roadmap reflects what's already there. This is the ONE
 legitimate file→DB direction; after it the DB owns content and the flow is

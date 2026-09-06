@@ -262,11 +262,17 @@ ChatGPT account.
 > **UI** Roadmap → Flags → Docs → Worktrees → Map · **Shells** cartographer · planner · dev · reviewer · admin
 
 The everyday cycle a fork runs once it's installed. Each step is owned by a
-**shell flavor**, and the work is done by the **skills** that flavor is granted
-(its flavor also sets its model defaults — see *Harnesses & models*). You move
-between flavors with `./sc enter-<shortname>`. Every flavor carries the common
-Subfloor process kit — `bootstrap`, `curate`, `db_map`, `issue_reporting`,
-`memory`, `messaging`, and `surface_catalogue` — so only the flavor-specific
+**shell flavor** (its flavor also sets its model defaults — see *Harnesses &
+models*). You move between flavors with `./sc enter-<shortname>`.
+
+Guidance is boot-first. Everything a shell does in most sessions — memory
+writes, the inbox, flags, version control, orientation — lives in the boot
+artifact every shell reads at launch; each flavor's own procedure (the dev's
+spec loop and testing posture, the reviewer's review steps, the planner's spec
+contract, the admin's root-checkout rules, the cartographer's map worklists)
+lives in its system prompt. Skills hold only work triggered by an event, a
+period, a request, or an armed Sprint. Every flavor carries the common kit —
+`curate`, `issue_reporting`, and `web_search` — so only the flavor-specific
 skills are called out below.
 
 Global skills have four purposes: explain Subfloor, identify a supplied tool,
@@ -298,12 +304,12 @@ it owns:
 
 | Flavor | Flavor skills | Owns |
 |---|---|---|
-| **cartographer** | `cartographer` | map · re-map |
-| **planner** | `docs` · `flags` · `onboard` · `fork_skill_design` · `dev_kit` · planning workflow skills | spec doc · local capability design · freeze + docs |
-| **dev** | `spec` · `redline_review` · `harness_readiness` · `docs` · `flags` · `sprint_dev` | break into tasks · implement · patch + test |
-| **reviewer** | `review` · `redline_review` · `flags` · `sprint_rev` | adversarial review |
-| **admin** | `admin_git` · `git_cleanup` · `engine_migrations` · `self_update` · `snapshot` | engine lifecycle · verify-clean |
-| **devops** | `git` · `flags` · `docs` | tracked runtime changes; fork-local host/deploy tools |
+| **cartographer** | `git` | map · re-map |
+| **planner** | `onboard` · `flag_sweep` · `fork_skill_design` · `dev_kit` · `themed_markdown` · `git` · `sprint_protocol` · `sprint_prep` · `sprint_pln` | spec doc · local capability design · freeze + docs |
+| **dev** | `git` · `redline_review` · `harness_readiness` · `sprint_protocol` · `sprint_dev` | break into tasks · implement · patch + test |
+| **reviewer** | `git` · `redline_review` · `sprint_protocol` · `sprint_rev` | review |
+| **admin** | `git_cleanup` · `engine_database` · `engine_migrations` · `self_update` · `snapshot` | engine lifecycle · verify-clean |
+| **devops** | `git` · `themed_markdown` | tracked runtime changes; fork-local host/deploy tools |
 
 1. **Install** — `./sc install` seeds your **starting team**: two `planner`
    (one is your primary), four `dev`, two `reviewer` shells, the `admin` that owns
@@ -311,42 +317,46 @@ it owns:
    *(admin · `self_update`, `engine_migrations` · UI: Shells)*
 2. **Map the repo** — the cartographer configures the index once with
    `./sc map-setup`, then `./sc map` builds it; git hooks re-map on every pull.
-   It's infrastructure working shells *read* via `surface_catalogue`.
-   *(cartographer · `cartographer` · UI: Map)*
+   It's infrastructure working shells *read* through `sc map-schema` and
+   `sc map-sql`, as their boot's ORIENTATION section describes.
+   *(cartographer · its system prompt · UI: Map)*
 3. **Spec it** — the **planner** authors a spec document against a roadmap
-   feature — viability, blockers, the done-condition. The spec and shipped docs
-   ride the `docs` skill. *(planner · `docs`, `flags` · UI: Roadmap)*
+   feature — viability, blockers, the done-condition — under the spec contract
+   in its system prompt, formatted per `themed_markdown`.
+   *(planner · system prompt, `themed_markdown` · UI: Roadmap)*
 4. **Switch to dev** — `./sc enter-dev` boots the **dev** shell into its own git
-   worktree on `shell/dev`, a base pinned to `origin/main`.
-   *(dev · `bootstrap`, `memory` · UI: Shells)*
-5. **Break it into tasks** — dev reads the spec and uses `spec` to decompose it
-   into `spec_tasks` (Preparation → steps → Verification), then works one task
-   per session. `memory` rolls `current_state` ("last / next task") so sessions
-   resume cleanly. *(dev · `spec`, `memory` · UI: Roadmap)*
+   worktree on `shell/dev`, a base pinned to `origin/main`. A first boot shows
+   FIRST RUN: read the map, read yourself, skim the plan, set `current_state`,
+   `sc mem oriented`. *(dev · boot · UI: Shells)*
+5. **Break it into tasks** — dev reads the spec and follows SPEC EXECUTION in
+   its system prompt to decompose it into `spec_tasks` (Preparation → steps →
+   Verification), then works one task per session. `current_state` ("last /
+   next task") lets sessions resume cleanly. *(dev · system prompt · UI: Roadmap)*
 6. **Implement** — within each task, dev cuts a feature branch off `shell/dev`,
    writes code, schema, and tests, then uses the exact `## DEV TOOLS` boot
    inventory to run the fork's declared checks.
-   *(dev · ambient DEV TOOLS, `redline_review`, `git` · UI: Shells)*
-7. **Send to review** — dev pushes and opens a PR (the `git` skill is
-   branch → commit → push → **PR → stop**; dev never merges), then messages the
-   reviewer. *(dev · `git`, `messaging` · UI: Flags)*
-8. **Review, send back** — the **reviewer** (a *different lineage* than the code
-   — defaults to Opus — so it isn't blind to the author's mistakes) reads the diff
-   against the spec through its review lenses, opens flags for failures, and
-   messages dev back. *(reviewer · `review`, ambient DEV TOOLS, `flags`, `messaging` · UI: Flags)*
+   *(dev · ambient DEV TOOLS, `redline_review` · UI: Shells)*
+7. **Send to review** — dev pushes and opens a PR (boot VERSION CONTROL:
+   branch → commit → push → **PR → stop**; commits carry the shell's trailer
+   automatically), then messages the reviewer with `sc mem message send`.
+   *(dev · boot · UI: Flags)*
+8. **Review, send back** — the **reviewer** reads the diff against the spec
+   through the lenses in its system prompt, opens flags for merge blockers, and
+   sends the FnB-approved handoff back to dev.
+   *(reviewer · system prompt, ambient DEV TOOLS · UI: Flags)*
 9. **Patch + test** — dev addresses the flags, re-runs `./sc test`, and
-   re-pushes; the thread closes when it's clean.
-   *(dev · ambient DEV TOOLS, `flags`, `git` · UI: Flags)*
-10. **Operator merges** — merging is the FnB's gate: an explicit directive
-    naming the PR (the one exception is the operator's grant recorded when an
-    orchestrated run is armed, which the engine checks live before the shell
-    merges). On dev's next boot
-    the launcher auto-syncs the base onto `origin/main` and prunes the merged
-    branch. *(operator gate; no shell skill · UI: Worktrees)*
-11. **Freeze spec + write docs** — on ship, the spec freezes (`frozen=1`,
-    immutable; the next stage opens a fresh `seq`) and the feature doc is authored
-    — both via `docs`. `snapshot` + `./sc render` write read-only local renders.
-    *(planner / dev · `docs`, `snapshot` · UI: Docs)*
+   re-pushes; the thread closes when it's clean and dev closes the flags its
+   work cleared. *(dev · ambient DEV TOOLS · UI: Flags)*
+10. **Operator merges** — merging is the FnB's gate in one of two forms: an
+    explicit directive naming the PR, or the grant recorded when a Sprint is
+    armed, which the engine checks live before the shell merges. On dev's next
+    boot the launcher auto-syncs the base onto `origin/main` and prunes the
+    merged branch. *(operator gate; no shell skill · UI: Worktrees)*
+11. **Freeze spec + write docs** — on ship, dev flips the feature to `shipped`
+    and opens a docs-pending flag; the planner freezes the spec (`frozen=1`,
+    immutable; the next stage opens a fresh `seq`) and writes the feature doc
+    from the shipped code. `snapshot` + `./sc render` write read-only local
+    renders. *(planner · system prompt; admin · `snapshot` · UI: Docs)*
 12. **Verify git trees clean** — the admin's `git_cleanup` triages every worktree
     (clean trees, prunable merged branches, preserved work); `./sc render-check`
     (local `_sc` must match the DB render) and `./sc verify` (rebuild +
@@ -354,7 +364,7 @@ it owns:
     *(admin · `git_cleanup`, `snapshot` · UI: Worktrees)*
 13. **Re-map** — the cartographer re-runs (auto on pull, or `./sc map`) so the
     index reflects the new shape — and the loop turns to the next feature.
-    *(cartographer · `cartographer` · UI: Map)*
+    *(cartographer · system prompt · UI: Map)*
 
 ![Review GUI, Roadmap tab — the full dev-cycle loop laid out across the planning stages](https://github.com/user-attachments/assets/36016883-35ad-42b8-8d70-da2eee899506)
 
@@ -567,6 +577,65 @@ Three generic tools cover work that should not live in one interactive context.
 `check` reads unread messages without acknowledging them; `mark-read` clears
 one only after it has been acted on. Sends carry a dedupe key, so a timed-out
 request can be verified with `sent` before any retry.
+
+### Wakes
+
+A wake delivers a message into a shell's session instead of waiting for its
+next boot. Shells are told only what to do with one (read it, act, accept
+Sprint work explicitly); the mechanics live here for the operator.
+
+- **Active-chat registry.** The engine tracks at most one active chat per
+  shell; zero is legal. The registry is the sole current-chat authority and
+  carries the verified pid/start-ticks identity only while a turn runs. Closing
+  or rotating a chat unlinks its process. A 60-second reaper verifies process
+  identity before interrupt/TERM/KILL escalation, and an inactivity ceiling
+  closes silent hung turns so they become reapable.
+- **Delivery intent and coalescing.** Every wake message creates durable
+  delivery intent. Pending wakes coalesce per receiver, and one wake turn
+  drains every undelivered message for that shell. The type resolves at
+  delivery: `re-enter` resumes the existing chat at its next boundary; `new`
+  opens a fresh chat when the shell has none or its chat is idle and is
+  absorbed at the boundary of a live turn; `force-new` is never absorbed — it
+  waits for the live turn to end and a quiet gate, then closes the old chat and
+  opens a fresh one. Sprint assignments, review requests, and verdicts are
+  `force-new`; Planner-bound results, decisions, and PR facts are `re-enter`.
+- **PR facts.** Developer-owned PR subscriptions (discovered from the
+  worktree's checked-out branch, `sc sprint register-pr` in a lane, or manual
+  `sc pr subscribe`) emit self-describing red/green/closed/merged wakes to the
+  owning Developer throughout ownership, inside or outside a Sprint; outside an
+  armed or paused Sprint, green arrives only as red-to-green recovery. Planner
+  and Reviewer receive no PR-event wakes.
+- **Coordinate mode.** Closing the Planner chat during an armed Sprint sets
+  coordinate mode: idle Planner `re-enter` wakes open fresh ticket chats.
+  Pause/resume from the GUI returns to supervise mode; automatic pauses
+  preserve the dial.
+- **Arming** validates every recorded role harness/model/effort selection
+  before publishing work; defaults satisfy the gate.
+
+### Sprint fallbacks (operator)
+
+The normal close is the conformance Reviewer's atomic `record-conformance`;
+these surfaces are the operator's explicit fallbacks and follow-ups. Target
+identities are engine-derived; never supply a path.
+
+```bash
+# bounded evidence packet when the Reviewer cannot compile it (max --limit 200)
+./sc sprint compile-report --sprint <id> --limit 50 > shared/sprints/sprint-<n>/evidence.json
+# inspect, retry, or adopt post-Sprint cleanup of participant worktrees
+./sc sprint cleanup-status --sprint <id>
+./sc sprint cleanup --sprint <id> --key <stable-retry-key>
+./sc sprint cleanup --sprint <legacy-id> --adopt-legacy --key <stable-adoption-key>
+# stop without deleting history (also a Planner action on a Reviewer decision)
+./sc sprint abort --sprint <id> --reason <reason> [--outcome <outcome>]
+# one disposition per pending follow-up after closure
+./sc sprint disposition-followup --sprint <id> --followup <id> --disposition accepted
+./sc sprint disposition-followup --sprint <id> --followup <id> --disposition resolved --resolution-file <path>
+```
+
+`accepted` acknowledges ship-as-is; `resolved` and `dismissed` require a
+bounded resolution file. A cleanup retry key is reused only for the identical
+request. The standalone `sc sprint complete` surface is likewise an
+operator-directed recovery fallback, never the normal clean close.
 
 ### Session-surviving jobs
 
@@ -1325,7 +1394,7 @@ The Roadmap tab renders the same feature rows two ways, toggled top-centre:
 > **Drive it from the shell, too.** `./sc mem roadmap project <feature_id> <work-stream>`
 > assigns a feature's work-stream and `./sc mem roadmap depends <feature_id> --on <id>`
 > sets its blocker edges (cycles refused) — the Flow view is the same data the
-> CLI and the `db_map` skill write.
+> CLI writes.
 
 The server runs **inside the sandbox container** as its foreground process, so
 `./sc launch` brings it up (printing its URL) and `./sc down` stops it. Under

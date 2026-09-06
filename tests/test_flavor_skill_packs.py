@@ -17,6 +17,38 @@ MIGRATIONS = ENGINE / "migrations"
 ROOT_ONLY_MARKER = "<!-- sc-root-only:"
 RATIFIED_OPT_INS = {
     "admin": {
+        "engine_database",
+        "engine_migrations",
+        "git_cleanup",
+        "self_update",
+        "snapshot",
+    },
+    "planner": {
+        "dev_kit",
+        "flag_sweep",
+        "fork_skill_design",
+        "git",
+        "onboard",
+        "sprint_pln",
+        "sprint_prep",
+        "sprint_protocol",
+        "themed_markdown",
+    },
+    "dev": {
+        "git",
+        "harness_readiness",
+        "redline_review",
+        "sprint_dev",
+        "sprint_protocol",
+    },
+    "reviewer": {"git", "redline_review", "sprint_protocol", "sprint_rev"},
+    "devops": {"git", "themed_markdown"},
+    "cartographer": {"git"},
+}
+# The pack matrix 0241 established, proven in isolation by the 0241 fixture
+# below; F72 (0257) retired twelve of these names and added two.
+RATIFIED_OPT_INS_AT_0241 = {
+    "admin": {
         "admin_git",
         "engine_database",
         "engine_migrations",
@@ -170,23 +202,23 @@ class HardCutoverMigrationTest(unittest.TestCase):
             }
             self.assertEqual(actual - common, expected, flavor)
 
-    def test_admin_git_asset_is_root_focused_not_working_shell_guidance(self) -> None:
-        body = (
-            ENGINE / "assets" / "skills" / "admin_git" / "SKILL.md"
-        ).read_text()
-        for section in (
-            "## Orient before writing",
-            "## Fast-forward main",
-            "## Commit a fork engine pin",
-            "## Merge an approved PR",
-            "## Source-repository exception",
-            "## Stop conditions",
+    def test_admin_body_is_root_focused_not_working_shell_guidance(self) -> None:
+        # F72: the admin_git skill folded into the admin flavor's procedure body.
+        body = (ENGINE / "templates" / "shells" / "admin.md").read_text()
+        for text in (
+            "## THE ROOT CHECKOUT",
+            "**Fast-forward main:**",
+            "**Commit the engine pin**",
+            "**Merge an approved PR**",
+            "**Source repository**",
+            "**Stop:**",
         ):
-            self.assertIn(section, body)
+            self.assertIn(text, body)
         self.assertIn("git pull --ff-only origin main", body)
         self.assertIn("SC_SHELL_FLAVOR=admin git commit", body)
         self.assertIn("Never switch its branch, stash,", body)
         self.assertNotIn("git checkout -b", body)
+        self.assertFalse((ENGINE / "assets" / "skills" / "admin_git").exists())
 
     def test_flag_sweep_is_planner_owned_and_not_a_boot_relay(self) -> None:
         body = (
@@ -273,7 +305,7 @@ class HardCutoverMigrationTest(unittest.TestCase):
                 "SELECT name FROM skills WHERE common=1 AND is_deleted=0"
             )
         }
-        for flavor, expected in RATIFIED_OPT_INS.items():
+        for flavor, expected in RATIFIED_OPT_INS_AT_0241.items():
             actual = {
                 row[0]
                 for row in con.execute(
