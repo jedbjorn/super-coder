@@ -1665,7 +1665,7 @@ ON CONFLICT(name) DO UPDATE SET
 
 INSERT INTO skills (name, description, category, command, common, content, is_deleted) VALUES (
   'git',
-  'Git conventions for a Subfloor shell — one repo, one cwd. Sync the base before work, branch before committing, open PRs (never merge without the FnB''s OK), attribute commits per-shell. Use before any git work.',
+  'Git conventions for a Subfloor shell — one repo, one cwd. Sync the base before work, branch before committing, open PRs (merge only at the FnB''s gate — an explicit directive, or the Sprint grant for a registered Sprint PR), attribute commits per-shell. Use before any git work.',
   'substrate',
   NULL,
   0,
@@ -1709,7 +1709,7 @@ The launcher auto-syncs at boot when provably nothing can be lost (on base branc
    ```
    Co-Authored-By: <shell display_name> (super-coder) <noreply@…>
    ```
-3. Push -> open a PR -> stop. Do NOT merge without an explicit FnB directive — opening is the default, merging is a separate gate.
+3. Push -> open a PR -> stop. Merging is the FnB''s gate, in one of two forms: outside an armed Sprint, an explicit FnB directive naming the PR; inside one, the grant the FnB gave by arming the Sprint — a registered Sprint PR merges through `sprint_dev`''s merge boundary and needs no second directive. Never wait for one; never merge on approval or green alone.
 
 ## The engine watches your PR — you don''t
 
@@ -3025,7 +3025,7 @@ ON CONFLICT(name) DO UPDATE SET
 
 INSERT INTO skills (name, description, category, command, common, content, is_deleted) VALUES (
   'sprint_dev',
-  'Execute a Sprints v2 Developer lane — accept one assignment, implement and verify it, own the PR through green and review, merge only after live authorization, and record judgment without overlapping edits.',
+  'Execute a Sprints v2 Developer lane — accept one assignment, implement and verify it, own the PR through green and review, merge under the Sprint grant once live authorization returns, and record judgment without overlapping edits.',
   'workflow',
   NULL,
   0,
@@ -3230,7 +3230,9 @@ sc sprint authorize-merge \
 
 Merge only the returned repository, PR, and head SHA. A refusal means not
 green, not approved, or not yours; fix that, never bypass it. A rebase does not
-undo approval.
+undo approval. The FnB granted this merge by arming the Sprint; this command
+verifies that grant live and is the only gate — never wait for a separate FnB
+directive, and never merge on approval or green alone.
 
 ## Post-merge handoff
 
@@ -3294,8 +3296,9 @@ dispatches every dependency-ready lane as a Force-new Developer wake) ⇄
 a time.
 
 A lane''s life: dispatched → Developer builds on a branch, registers the PR,
-requests review → Reviewer records a verdict → Developer authorizes the merge
-on live green → the merged-work handoff wakes you → you dispatch whatever
+requests review → Reviewer records a verdict → Developer merges under the
+Sprint grant once `authorize-merge` returns live green + approved (no FnB
+directive per PR) → the merged-work handoff wakes you → you dispatch whatever
 became ready. After the last lane the conformance Reviewer records the
 whole-Sprint report; the engine closes the Sprint and cleans worktrees. The
 engine delivers every wake and watches every registered PR; you never poll or
@@ -3700,7 +3703,9 @@ Produce one editable prepared Sprint with:
   assigned Reviewer;
 - dependency edges and planned waves;
 - one harness/model/Thinking level (`effort`) intent per participant;
-- a committed Sprint merge grant; and
+- the Sprint merge grant — the FnB''s merge authorization for every registered
+  Sprint PR, given by deciding to run the Sprint and recorded with
+  `--merge-grant`; the engine refuses to declare or arm without it; and
 - a capacity plan sized to justified parallel work and review demand, with the
   local/GitHub capacity to execute it.
 
@@ -3755,8 +3760,7 @@ Refuse arming when any of these is true:
 - participant routes or required capacity are unavailable;
 - a selected shell has an unresolved cleanup target from an earlier Sprint;
 - another Sprint is armed, or a selected shell already participates in an armed
-  Sprint; or
-- the merge grant was not committed as part of the final plan.
+  Sprint.
 
 Deficiencies remain editable in `prepared`. Do not weaken an invariant merely
 to get to `armed`; surface the missing fact or capacity to the FnB.

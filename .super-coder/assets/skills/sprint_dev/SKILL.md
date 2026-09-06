@@ -1,6 +1,6 @@
 ---
 name: sprint_dev
-description: Execute a Sprints v2 Developer lane — accept one assignment, implement and verify it, own the PR through green and review, merge only after live authorization, and record judgment without overlapping edits.
+description: Execute a Sprints v2 Developer lane — accept one assignment, implement and verify it, own the PR through green and review, merge under the Sprint grant once live authorization returns, and record judgment without overlapping edits.
 category: workflow
 common: false
 ---
@@ -206,7 +206,9 @@ sc sprint authorize-merge \
 
 Merge only the returned repository, PR, and head SHA. A refusal means not
 green, not approved, or not yours; fix that, never bypass it. A rebase does not
-undo approval.
+undo approval. The FnB granted this merge by arming the Sprint; this command
+verifies that grant live and is the only gate — never wait for a separate FnB
+directive, and never merge on approval or green alone.
 
 ## Post-merge handoff
 

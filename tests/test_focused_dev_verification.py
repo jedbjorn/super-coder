@@ -21,6 +21,7 @@ MIGRATIONS = (
     ENGINE / "migrations" / "0252_reseed_universal_pr_owner_wakes.sql",
     ENGINE / "migrations" / "0253_reseed_sprint_review_flexibility.sql",
     ENGINE / "migrations" / "0254_reseed_task_context_projection.sql",
+    ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql",
 )
 sys.path.insert(0, str(ENGINE / "scripts"))
 

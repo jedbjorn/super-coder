@@ -156,10 +156,20 @@ feature branch — so you build on current code.
 Branch before you build. Before the **first edit** of a new unit of work,
 create a branch — `git checkout -b <type>/<short-desc>` (feat/fix/chore/docs).
 One branch per unit of work. Commit each unit when it is done, then push, open
-a PR, and **stop** — merging is the FnB's gate. This is enforced, not just
-asked: claude/codex/opencode block edits on the default branch at the harness
-level, and a git pre-commit hook refuses the commit on every harness; launched
-shells receive no bypass.
+a PR, and **stop** — merging is the FnB's gate.
+
+**The merge gate has exactly two forms.** Outside an armed Sprint, merge only on
+an explicit FnB directive naming the PR. Inside an armed Sprint, arming *is*
+that directive: the FnB's decision to arm grants each Developer the right to
+merge its own registered PR once `sc sprint authorize-merge` returns it (live
+green + approved). No second directive is needed there, and nothing else —
+a Reviewer's approval, green checks, a Planner message — substitutes for either
+form.
+
+The branch rule is enforced, not just asked: claude/codex/opencode block edits
+on the default branch at the harness level, and a git
+pre-commit hook refuses the commit on every harness; launched shells receive
+no bypass.
 
 Treat `shell/<shortname>` as a disposable base, not durable storage — durable
 coordination lives in the control plane and code lives on a pushed branch with a PR. When

@@ -57,8 +57,9 @@ SPEC_SKILL = ENGINE / "assets" / "skills" / "spec" / "SKILL.md"
 CONTEXT_EFFICIENT_SKILLS = ("sprint_dev", "sprint_rev", "sprint_pln", "spec")
 # Raised 47_414 -> 47_612 with 0253 (verdicts open a fresh Developer chat; the
 # Developer carries rationale in the PR body) -> 48_155 with 0254 (spec #187's
-# load-first `sc context` directive in sprint_dev + spec).
-CONTEXT_EFFICIENT_SKILL_BYTE_CEILING = 48_155
+# load-first `sc context` directive in sprint_dev + spec) -> 48_451 with 0255
+# (the merge gate's Sprint form named in sprint_dev + sprint_pln).
+CONTEXT_EFFICIENT_SKILL_BYTE_CEILING = 48_451
 CONTEXT_EFFICIENT_RESEED = (
     ENGINE / "migrations" / "0202_reseed_context_efficient_skills.sql"
 )
@@ -91,6 +92,9 @@ SUBFLOOR_COMMAND_RESEED = (
 )
 UNIVERSAL_PR_WAKES_RESEED = (
     ENGINE / "migrations" / "0252_reseed_universal_pr_owner_wakes.sql"
+)
+MERGE_GATE_RESEED = (
+    ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql"
 )
 
 
@@ -214,6 +218,7 @@ class SprintSkillTest(unittest.TestCase):
             con.executescript(BINDING_GUIDANCE_RESEED.read_text())
             con.executescript(DISPOSITION_VERBS_RESEED.read_text())
             con.executescript(REVIEW_FLEXIBILITY_RESEED.read_text())
+            con.executescript(MERGE_GATE_RESEED.read_text())
 
             for name in sorted(CONFORMANCE_OWNER_SKILLS):
                 with self.subTest(name=name):
@@ -721,6 +726,7 @@ class SprintSkillTest(unittest.TestCase):
             )
             con.executescript(CONFORMANCE_OWNER_RESEED.read_text())
             con.executescript(BINDING_GUIDANCE_RESEED.read_text())
+            con.executescript(MERGE_GATE_RESEED.read_text())
 
             parsed = seed_skills.parse_skill(ASSETS / "sprint_prep" / "SKILL.md")
             row = con.execute(
@@ -747,7 +753,7 @@ class SprintSkillTest(unittest.TestCase):
                 "no current non-empty `spec` document",
                 "a selected task belongs to no work unit or more than one work unit",
                 "participant routes or required capacity are unavailable",
-                "merge grant was not committed",
+                "the engine refuses to declare or arm without it",
                 "State whether pre-Sprint QA/QC was performed",
             ):
                 self.assertIn(guidance, normalized)
@@ -833,6 +839,9 @@ class SprintSkillTest(unittest.TestCase):
             ).read_text()
             con.executescript(later)
             con.executescript(later)
+            gate = MERGE_GATE_RESEED.read_text()
+            con.executescript(gate)
+            con.executescript(gate)
 
             for skill in sorted(POLISHED_SPRINT_SKILLS):
                 with self.subTest(name=skill):
@@ -844,6 +853,82 @@ class SprintSkillTest(unittest.TestCase):
                     self.assertEqual([(parsed["content"], 0)], [tuple(r) for r in rows])
                     self.assertNotIn("approved head", parsed["content"])
                     self.assertNotIn("Approval is stale evidence", parsed["content"])
+        finally:
+            con.close()
+
+    def test_merge_gate_reseed_matches_assets_and_replays_idempotently(self):
+        names = ("git", "sprint_prep", "sprint_pln", "sprint_dev")
+        con = sqlite3.connect(":memory:")
+        try:
+            con.executescript(
+                "CREATE TABLE skills ("
+                "skill_id INTEGER PRIMARY KEY, name TEXT UNIQUE, description TEXT, "
+                "category TEXT, command TEXT, common INTEGER, content TEXT, "
+                "is_deleted INTEGER DEFAULT 0);"
+                "INSERT INTO skills VALUES "
+                "(99,'fork_only','local','fork',NULL,0,'bespoke body',0);"
+            )
+            for index, name in enumerate(names, 1):
+                con.execute(
+                    "INSERT INTO skills VALUES (?,?,?,?,?,?,?,1)",
+                    (index, name, "stale", "stale", "stale", 1,
+                     "Do NOT merge without an explicit FnB directive"),
+                )
+            migration = MERGE_GATE_RESEED.read_text()
+            con.executescript(migration)
+            con.executescript(migration)
+
+            for name in names:
+                with self.subTest(name=name):
+                    parsed = seed_skills.parse_skill(ASSETS / name / "SKILL.md")
+                    rows = con.execute(
+                        "SELECT description,category,command,common,content,is_deleted "
+                        "FROM skills WHERE name=?",
+                        (name,),
+                    ).fetchall()
+                    self.assertEqual(1, len(rows))
+                    self.assertEqual(
+                        (
+                            parsed["description"],
+                            parsed["category"],
+                            parsed["command"],
+                            parsed["common"],
+                            parsed["content"],
+                            0,
+                        ),
+                        tuple(rows[0]),
+                    )
+            self.assertEqual(
+                ("fork", "bespoke body", 0),
+                tuple(
+                    con.execute(
+                        "SELECT category,content,is_deleted FROM skills "
+                        "WHERE name='fork_only'"
+                    ).fetchone()
+                ),
+            )
+            self.assertEqual(5, con.execute("SELECT COUNT(*) FROM skills").fetchone()[0])
+
+            bodies = {
+                name: " ".join(
+                    seed_skills.parse_skill(ASSETS / name / "SKILL.md")["content"].split()
+                )
+                for name in names
+            }
+            boot = " ".join((ENGINE / "templates" / "boot.md").read_text().split())
+            # One rule, two forms, stated in boot and pointed at from each skill.
+            self.assertIn("The merge gate has exactly two forms.", boot)
+            self.assertIn("arming *is* that directive", boot)
+            self.assertIn("Merging is the FnB's gate, in one of two forms", bodies["git"])
+            self.assertIn("needs no second directive", bodies["git"])
+            self.assertNotIn("Do NOT merge without an explicit FnB directive", bodies["git"])
+            self.assertIn("the FnB's merge authorization", bodies["sprint_prep"])
+            self.assertIn("the engine refuses to declare or arm without it", bodies["sprint_prep"])
+            self.assertNotIn("merge grant was not committed", bodies["sprint_prep"])
+            self.assertIn("Developer merges under the Sprint grant", bodies["sprint_pln"])
+            self.assertNotIn("Developer authorizes the merge", bodies["sprint_pln"])
+            self.assertIn("The FnB granted this merge by arming the Sprint", bodies["sprint_dev"])
+            self.assertIn("never wait for a separate FnB directive", bodies["sprint_dev"])
         finally:
             con.close()
 
@@ -950,6 +1035,7 @@ class SprintSkillTest(unittest.TestCase):
             con.executescript(SUBFLOOR_COMMAND_RESEED.read_text())
             con.executescript(UNIVERSAL_PR_WAKES_RESEED.read_text())
             con.executescript(REVIEW_FLEXIBILITY_RESEED.read_text())
+            con.executescript(MERGE_GATE_RESEED.read_text())
 
             self.assertIsNotNone(
                 con.execute(

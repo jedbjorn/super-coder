@@ -735,6 +735,10 @@ class GuidanceTest(unittest.TestCase):
             "content TEXT, is_deleted INTEGER DEFAULT 0);")
         con.executescript(path.read_text())
         con.executescript(path.read_text())          # idempotent
+        # 0255 re-owns sprint_dev after this reseed; compare once it replayed.
+        later = ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql"
+        con.executescript(later.read_text())
+        con.executescript(later.read_text())
         for name in ("cartographer", "spec", "sprint_dev", "surface_catalogue"):
             parsed = seed_skills.parse_skill(ENGINE / "assets" / "skills" / name / "SKILL.md")
             row = con.execute(
@@ -743,7 +747,7 @@ class GuidanceTest(unittest.TestCase):
             self.assertEqual(tuple(row), (parsed["description"], parsed["category"],
                                           parsed["command"], parsed["common"],
                                           parsed["content"], 0), name)
-        self.assertEqual(con.execute("SELECT COUNT(*) FROM skills").fetchone()[0], 4)
+        self.assertEqual(con.execute("SELECT COUNT(*) FROM skills").fetchone()[0], 7)
 
 
 if __name__ == "__main__":
