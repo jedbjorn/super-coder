@@ -155,7 +155,8 @@
     ".super-coder/migrations/0253_reseed_sprint_review_flexibility.sql",
     ".super-coder/migrations/0255_reseed_merge_gate_one_rule.sql",
     ".super-coder/migrations/0256_current_state_500.sql",
-    ".super-coder/migrations/0257_guidance_reconciliation.sql"
+    ".super-coder/migrations/0257_guidance_reconciliation.sql",
+    ".super-coder/migrations/0258_reseed_non_sprint_green_wake.sql"
   ],
   "baseline_migration_ledger": {
     "count": 142,
@@ -864,7 +865,7 @@
         "opens a fresh one. Sprint assignments, review requests, and verdicts are",
         "worktree's checked-out branch, `sc sprint register-pr` in a lane, or manual",
         "owning Developer throughout ownership, inside or outside a Sprint; outside an",
-        "armed or paused Sprint, green arrives only as red-to-green recovery. Planner",
+        "armed or paused Sprint a green wake names the FnB merge directive as the",
         "- **Coordinate mode.** Closing the Planner chat during an armed Sprint sets",
         "### Sprint fallbacks (operator)",
         "./sc sprint compile-report --sprint <id> --limit 50 > shared/sprints/sprint-<n>/evidence.json",

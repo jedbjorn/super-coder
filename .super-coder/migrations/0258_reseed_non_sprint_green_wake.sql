@@ -1,15 +1,24 @@
----
-name: sprint_dev
-description: Execute a Sprints v2 Developer lane — accept one assignment, implement and verify it, own the PR through green and review, merge under the Sprint grant once live authorization returns, and record judgment without overlapping edits.
-category: workflow
-common: false
----
+-- 0258 — reseed sprint_dev for non-Sprint green owner wakes (decision #317
+-- superseded). Outside an armed or paused Sprint the FnB merges a named PR on
+-- green, so green is the actionable fact: the watcher now delivers every
+-- non-Sprint green (not only red-to-green recovery) with a body that names the
+-- FnB merge directive as the gate. No schema change: a full-body UPSERT
+-- converges upgraded installations on the same text a fresh seed produces.
+-- Idempotent.
 
-# sprint_dev — own one editing lane
+BEGIN;
+
+INSERT INTO skills (name, description, category, command, common, content, is_deleted) VALUES (
+  'sprint_dev',
+  'Execute a Sprints v2 Developer lane — accept one assignment, implement and verify it, own the PR through green and review, merge under the Sprint grant once live authorization returns, and record judgment without overlapping edits.',
+  'workflow',
+  NULL,
+  0,
+  '# sprint_dev — own one editing lane
 
 Load `sprint_protocol` first; it holds the lifecycle, wake types, inbox
 commands, relay contract, body limits, artifact paths, receipt recovery, and
-authority boundary. This skill holds only the Developer's steps.
+authority boundary. This skill holds only the Developer''s steps.
 
 ## Route the entry
 
@@ -25,10 +34,10 @@ authority boundary. This skill holds only the Developer's steps.
 expected output, linked tasks, bound revision id, active decisions,
 dependencies, unit blockers, roles, worktree, lifecycle walls, resources. Read
 the full bound revision or broader indexes only for an unresolved need. Own
-one active unit; never start another lane or edit another shell's worktree.
+one active unit; never start another lane or edit another shell''s worktree.
 Resolve ambiguity to shippable in-scope work + rationale. Ask the Planner
 before changing boundary, interface, deliverable, priority, or scope; ask the
-Reviewer about review evidence. Use the relay's unit question/blocker form and
+Reviewer about review evidence. Use the relay''s unit question/blocker form and
 stop at a decision boundary until the answer arrives.
 
 A Developer does not pause the Sprint. Report blocker or integrity evidence to
@@ -108,7 +117,7 @@ Complete each round in order:
 2. Perform the once-only inbox check; handle and `accept` new messages.
 3. Use `submit` first or `resubmit` after changes requested. The engine injects
    the PR URL, registered id, exact green head, and work-unit id into the
-   Reviewer's canonical bare one-line locator. Create no readiness file. Send
+   Reviewer''s canonical bare one-line locator. Create no readiness file. Send
    no scope narrative, verification evidence, rationale, or review-focus
    steering in the request. The PR body carries the work-unit id and spec
    reference plus your rationale (decisions, rejected trade-offs): each verdict
@@ -173,4 +182,12 @@ Report broken bases, destructive ambiguity, unavailable GitHub, untrustworthy
 runners, provider exhaustion, or unrecoverable environment with evidence,
 impact, and recommendation. Stop when merged + reported, declined, returned to
 review, paused for a native wake, or awaiting Planner/FnB recovery. Ask for
-later work only after this editing lane is terminal.
+later work only after this editing lane is terminal.',
+  0
+)
+ON CONFLICT(name) DO UPDATE SET
+  description=excluded.description, category=excluded.category,
+  command=excluded.command, common=excluded.common,
+  content=excluded.content, is_deleted=0;
+
+COMMIT;
