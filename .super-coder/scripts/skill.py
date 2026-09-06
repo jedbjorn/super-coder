@@ -731,7 +731,11 @@ def _retire_spec(con, name: str) -> tuple[bool, int]:
 
 
 def _unretire_spec(con, name: str) -> int:
-    """Restore one retired engine skill. Returns the grants live again."""
+    """Restore one retired engine skill. Returns the grants live again.
+
+    A listed name with no `skills` row (upstream removed the engine skill, or
+    a typo) is a stale entry: drop it from the list and return 0 — the list
+    is the fork's to keep tidy, and `unretire` is its only supported writer."""
     names = seed_skills.retired_skill_names()
     if name not in names:
         raise SkillConflictError(
@@ -743,9 +747,11 @@ def _unretire_spec(con, name: str) -> int:
         skill_projection.reconcile_existing_checkouts(con)
     except skill_projection.ProjectionError as exc:
         sys.exit(skill_projection.partial_failure_message(f"unretire {name}", exc))
-    return grant_count(
-        con, con.execute(
-            "SELECT skill_id FROM skills WHERE name=?", (name,)).fetchone()[0])
+    row = con.execute(
+        "SELECT skill_id FROM skills WHERE name=?", (name,)).fetchone()
+    if row is None:
+        return 0
+    return grant_count(con, row[0])
 
 
 def _retire_list_note() -> str:
@@ -770,7 +776,11 @@ def cmd_unretire(con, name: str) -> int:
         grants = _unretire_spec(con, name)
     except SkillConflictError as exc:
         sys.exit(f"sc skill: {exc}")
-    print(f"unretire: {name} — restored with {grants} grant(s) live again.")
+    if name not in set(seed_skills.seeded_skill_names()):
+        print(f"unretire: {name} — removed stale entry; no engine skill by "
+              "that name exists to restore.")
+    else:
+        print(f"unretire: {name} — restored with {grants} grant(s) live again.")
     print(_retire_list_note())
     return 0
 
