@@ -31,6 +31,9 @@
     "model_flag": "-m",
     "effort": { "config_flag": "-c", "config_key": "model_reasoning_effort" }
   },
+  "host_admin": {
+    "launch_flags": ["--sandbox", "danger-full-access", "--ask-for-approval", "never"]
+  },
   "conversation": {
     "contract_version": 1,
     "minimum_cli_version": "0.145.0",
