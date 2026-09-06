@@ -144,16 +144,47 @@ def _sha_value(value: Any) -> str | None:
     return text
 
 
+def _check_identity(item: dict[str, Any]) -> str | None:
+    name = item.get("name") or item.get("context")
+    return str(name) if name else None
+
+
+def _item_state(item: dict[str, Any]) -> str | None:
+    state = item.get("conclusion") or item.get("state") or item.get("status")
+    return str(state).upper() if state else None
+
+
+def _drop_superseded_cancellations(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ignore a cancelled run whose check name has another, non-cancelled run.
+
+    GitHub keeps every check run recorded against the head commit in the
+    rollup, so a duplicate workflow run cancelled by concurrency control sits
+    beside its replacement under the same name. GitHub's own gate reads the
+    replacement; a cancelled run only counts when no other run of that check
+    exists (#1376).
+    """
+    replaced: set[str] = set()
+    for item in items:
+        name = _check_identity(item)
+        if name is not None and _item_state(item) != "CANCELLED":
+            replaced.add(name)
+    return [
+        item
+        for item in items
+        if not (
+            _item_state(item) == "CANCELLED"
+            and _check_identity(item) in replaced
+        )
+    ]
+
+
 def _check_state(raw: Any) -> tuple[str | None, bool]:
     if not isinstance(raw, list):
         return None, False
-    states: list[str] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        state = item.get("conclusion") or item.get("state") or item.get("status")
-        if state:
-            states.append(str(state).upper())
+    items = _drop_superseded_cancellations(
+        [item for item in raw if isinstance(item, dict)]
+    )
+    states = [state for state in map(_item_state, items) if state]
     if any(state in _FAILED_CHECKS for state in states):
         return "FAILURE", True
     if any(state in _PENDING_CHECKS for state in states):
