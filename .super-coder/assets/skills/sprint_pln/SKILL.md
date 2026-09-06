@@ -28,8 +28,9 @@ dispatches every dependency-ready lane as a Force-new Developer wake) ⇄
 a time.
 
 A lane's life: dispatched → Developer builds on a branch, registers the PR,
-requests review → Reviewer records a verdict → Developer authorizes the merge
-on live green → the merged-work handoff wakes you → you dispatch whatever
+requests review → Reviewer records a verdict → Developer merges under the
+Sprint grant once `authorize-merge` returns live green + approved (no FnB
+directive per PR) → the merged-work handoff wakes you → you dispatch whatever
 became ready. After the last lane the conformance Reviewer records the
 whole-Sprint report; the engine closes the Sprint and cleans worktrees. The
 engine delivers every wake and watches every registered PR; you never poll or

@@ -13,6 +13,7 @@ ENGINE = ROOT / ".super-coder"
 BOOT = ENGINE / "templates" / "boot.md"
 ASSET = ENGINE / "assets" / "skills" / "git" / "SKILL.md"
 RESEED = ENGINE / "migrations" / "0252_reseed_universal_pr_owner_wakes.sql"
+LATER_RESEED = ENGINE / "migrations" / "0255_reseed_merge_gate_one_rule.sql"
 
 sys.path.insert(0, str(ENGINE / "scripts"))
 import seed_skills  # noqa: E402
@@ -66,6 +67,11 @@ class GitSyncPolicyTest(unittest.TestCase):
             migration = RESEED.read_text()
             con.executescript(migration)
             con.executescript(migration)
+            # 0255 re-owns the git body after this reseed; the asset comparison
+            # holds once the later owner has replayed as well.
+            later = LATER_RESEED.read_text()
+            con.executescript(later)
+            con.executescript(later)
 
             parsed = seed_skills.parse_skill(ASSET)
             actual = con.execute(

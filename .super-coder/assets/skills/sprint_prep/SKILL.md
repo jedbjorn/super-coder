@@ -26,7 +26,9 @@ Produce one editable prepared Sprint with:
   assigned Reviewer;
 - dependency edges and planned waves;
 - one harness/model/Thinking level (`effort`) intent per participant;
-- a committed Sprint merge grant; and
+- the Sprint merge grant — the FnB's merge authorization for every registered
+  Sprint PR, given by deciding to run the Sprint and recorded with
+  `--merge-grant`; the engine refuses to declare or arm without it; and
 - a capacity plan sized to justified parallel work and review demand, with the
   local/GitHub capacity to execute it.
 
@@ -81,8 +83,7 @@ Refuse arming when any of these is true:
 - participant routes or required capacity are unavailable;
 - a selected shell has an unresolved cleanup target from an earlier Sprint;
 - another Sprint is armed, or a selected shell already participates in an armed
-  Sprint; or
-- the merge grant was not committed as part of the final plan.
+  Sprint.
 
 Deficiencies remain editable in `prepared`. Do not weaken an invariant merely
 to get to `armed`; surface the missing fact or capacity to the FnB.

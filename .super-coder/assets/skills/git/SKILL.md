@@ -1,6 +1,6 @@
 ---
 name: git
-description: Git conventions for a Subfloor shell — one repo, one cwd. Sync the base before work, branch before committing, open PRs (never merge without the FnB's OK), attribute commits per-shell. Use before any git work.
+description: Git conventions for a Subfloor shell — one repo, one cwd. Sync the base before work, branch before committing, open PRs (merge only at the FnB's gate — an explicit directive, or the Sprint grant for a registered Sprint PR), attribute commits per-shell. Use before any git work.
 category: substrate
 common: false
 ---
@@ -45,7 +45,7 @@ The launcher auto-syncs at boot when provably nothing can be lost (on base branc
    ```
    Co-Authored-By: <shell display_name> (super-coder) <noreply@…>
    ```
-3. Push -> open a PR -> stop. Do NOT merge without an explicit FnB directive — opening is the default, merging is a separate gate.
+3. Push -> open a PR -> stop. Merging is the FnB's gate, in one of two forms: outside an armed Sprint, an explicit FnB directive naming the PR; inside one, the grant the FnB gave by arming the Sprint — a registered Sprint PR merges through `sprint_dev`'s merge boundary and needs no second directive. Never wait for one; never merge on approval or green alone.
 
 ## The engine watches your PR — you don't
 
