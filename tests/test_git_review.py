@@ -76,6 +76,36 @@ class GitHubReaderTest(unittest.TestCase):
             with self.subTest(rollup=rollup):
                 self.assertEqual(expected, _check_state(rollup))
 
+    def test_cancelled_duplicate_run_is_superseded_by_same_named_run(self) -> None:
+        # #1376: concurrency control cancels a duplicate workflow run; GitHub
+        # keeps it in the rollup beside its replacement under the same name.
+        cancelled = {"name": "gitleaks", "status": "COMPLETED", "conclusion": "CANCELLED"}
+        green = {"name": "gitleaks", "status": "COMPLETED", "conclusion": "SUCCESS"}
+        queued = {"name": "gitleaks", "status": "QUEUED", "conclusion": None}
+        other = {"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}
+        cases = (
+            ([cancelled, green, other], ("SUCCESS", False)),
+            ([green, cancelled, other], ("SUCCESS", False)),
+            ([cancelled, queued, other], ("PENDING", False)),
+            ([cancelled, other], ("FAILURE", True)),
+            ([cancelled, cancelled, other], ("FAILURE", True)),
+            # A cancelled run of one check never borrows another check's success.
+            ([{"name": "lint", "conclusion": "CANCELLED"}, green], ("FAILURE", True)),
+            # Legacy status contexts supersede by context the same way.
+            (
+                [
+                    {"context": "ci/scan", "state": "CANCELLED"},
+                    {"context": "ci/scan", "state": "SUCCESS"},
+                ],
+                ("SUCCESS", False),
+            ),
+            # Unnamed items keep their verdict.
+            ([{"conclusion": "CANCELLED"}, green], ("FAILURE", True)),
+        )
+        for rollup, expected in cases:
+            with self.subTest(rollup=rollup):
+                self.assertEqual(expected, _check_state(rollup))
+
     def test_list_normalizes_full_projection_with_read_only_command(self) -> None:
         payload = json.dumps(MockGitHub().list_prs()).encode()
         calls = []
