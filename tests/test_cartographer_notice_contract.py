@@ -54,8 +54,9 @@ class ShapeNoticeParserTest(unittest.TestCase):
 
 class InstructionContractTest(unittest.TestCase):
     def setUp(self):
+        # F72: the cartographer procedure lives in its flavor body.
         self.skill = (
-            ENGINE / "assets" / "skills" / "cartographer" / "SKILL.md"
+            ENGINE / "templates" / "shells" / "cartographer.md"
         ).read_text()
 
     def test_sender_contract_requires_flag_identity_or_none(self):
@@ -71,7 +72,7 @@ class InstructionContractTest(unittest.TestCase):
     def test_cartographer_closes_exact_rows_before_marking_read(self):
         get_position = self.skill.index("sc mem get flags <numeric_id>")
         close_position = self.skill.index("sc mem flag close")
-        read_position = self.skill.index("--message mark-read <message_id>")
+        read_position = self.skill.index("sc mem message mark-read <message_id>")
         self.assertLess(get_position, close_position)
         self.assertLess(close_position, read_position)
         self.assertIn("ID/name mismatch", self.skill)

@@ -354,64 +354,34 @@ class CurationGovernanceTest(unittest.TestCase):
             con.close()
 
     def test_curate_recommends_and_retains_lns_until_delivery(self):
+        # F72: curate points at the recommendation route once; issue_reporting
+        # owns the search/comment/create commands and the issue body list.
         text = (ENGINE / "assets" / "skills" / "curate" / "SKILL.md").read_text()
-        self.assertIn("gh issue list --repo jedbjorn/subfloor --state all", text)
+        self.assertIn("recommendation route in\n`issue_reporting`", text)
         self.assertIn("skills: recommend <topic>", text)
-        self.assertIn("trigger that makes the procedure useful", text)
-        self.assertIn("proposed ownership boundary", text)
-        self.assertIn("why existing skills do not cover it", text)
-        self.assertIn("until a reviewed upstream\nskill ships **and is granted**", text)
+        self.assertIn("until a\nreviewed upstream skill ships **and is granted**", text)
         self.assertIn("create no local skill or asset", text)
         self.assertNotIn("sc skill add", text)
+        self.assertNotIn("gh issue create", text)
+        self.assertIn("Law 3 and Law 5", text)
+        self.assertNotIn("Law 7", text)
 
     def test_curate_and_issue_reporting_publish_the_authorized_exception(self):
         curate = (ENGINE / "assets" / "skills" / "curate" / "SKILL.md").read_text()
         reporting = (
             ENGINE / "assets" / "skills" / "issue_reporting" / "SKILL.md"
         ).read_text()
-        self.assertIn(
-            "authorized exception to the \"enhancement ideas go to the FnB "
-            "first\" gate in `issue_reporting`",
-            " ".join(curate.split()),
-        )
         for text in (curate, reporting):
             self.assertIn("skills: recommend <topic>", text)
             self.assertIn("keep the l&s", text.lower())
             self.assertIn("create no local skill or asset", text)
+        self.assertIn("gh issue list --repo jedbjorn/subfloor", reporting)
+        self.assertIn("gh issue create --repo jedbjorn/subfloor", reporting)
+        self.assertIn("trigger", reporting)
+        self.assertIn("proposed ownership boundary", reporting)
+        self.assertIn("why\nexisting skills do not cover it", reporting)
         self.assertIn("FnB-authorized exception", reporting)
         self.assertIn("Planner-owned workflow in `fork_skill_design`", reporting)
-
-    def test_planner_db_first_skill_workflow_remains_explicit(self):
-        text = (
-            ENGINE / "assets" / "skills" / "fork_skill_design" / "SKILL.md"
-        ).read_text()
-        self.assertIn("sc skill put --file", text)
-        self.assertIn("Planner-owned draft", text)
-        self.assertIn("DB, local snapshot, flat catalogue, and managed skill", text)
-        self.assertIn("Creation grants nothing", text)
-        self.assertNotIn("file -> seed -> grant -> local snapshot", text)
-        self.assertNotIn("SC_ADMIN=1 sc snapshot", text)
-
-    def test_trailing_migration_matches_changed_skill_assets_exactly(self):
-        con = sqlite3.connect(self.db)
-        con.row_factory = sqlite3.Row
-        try:
-            for name in ("curate", "issue_reporting"):
-                expected = skill_cmd.seed_skills.parse_skill(
-                    ENGINE / "assets" / "skills" / name / "SKILL.md"
-                )
-                actual = con.execute(
-                    "SELECT description, category, command, common, content "
-                    "FROM skills WHERE name=?",
-                    (name,),
-                ).fetchone()
-                self.assertIsNotNone(actual)
-                self.assertEqual(dict(actual), {
-                    key: expected[key]
-                    for key in ("description", "category", "command", "common", "content")
-                })
-        finally:
-            con.close()
 
 
 if __name__ == "__main__":

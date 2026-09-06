@@ -569,7 +569,7 @@ class AssemblerSmokeTest(unittest.TestCase):
         self.assertEqual(
             fixture["granted_shells"], [self.ids["bespoke_shell_id"]])
         # an engine-seeded skill derives as engine
-        self.assertEqual(by_name["db_map"]["origin"], "engine")
+        self.assertEqual(by_name["curate"]["origin"], "engine")
 
     def test_get_shell_skills_carry_origin(self) -> None:
         out = server.get_shell(self.con, self.ids["shell_id"])

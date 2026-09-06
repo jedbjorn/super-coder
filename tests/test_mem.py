@@ -1005,19 +1005,15 @@ class ApiMemTest(unittest.TestCase):
         finally:
             self.write("DROP TRIGGER fail_atomic_spec_move")
 
-    def test_feature_move_guidance_is_seeded_for_shells(self):
-        for skill in ("db_map", "docs", "spec"):
-            with self.subTest(skill=skill):
-                content = self.q(
-                    "SELECT content FROM skills WHERE name=? AND is_deleted=0",
-                    skill,
-                )[0]
-                self.assertIn(
-                    "sc mem doc move <document_id> --feature <target_feature_id>",
-                    content,
-                )
-        docs = self.q("SELECT content FROM skills WHERE name='docs'")[0]
-        self.assertIn("Split an active era from feature history", docs)
+    def test_feature_move_guidance_is_rendered_for_shells(self):
+        # F72: the move verb lives in the planner and dev flavor bodies.
+        for flavor in ("planner", "dev"):
+            with self.subTest(flavor=flavor):
+                body = (ENGINE / "templates" / "shells" / f"{flavor}.md").read_text()
+                self.assertIn("sc mem doc move <document_id> --feature <target>", body)
+        planner = (ENGINE / "templates" / "shells" / "planner.md").read_text()
+        self.assertIn("## REVISE, FREEZE, DOCUMENT", planner)
+        self.assertIn("sc mem doc move", (ENGINE / "scripts" / "mem.py").read_text())
 
     # ── doc write vs local save — ONE shared serialization boundary ───────────
     def test_doc_write_and_snapshot_share_one_lock(self):

@@ -33,7 +33,7 @@ import skill as skill_cli
 import render_check
 import server
 
-ENGINE_SKILLS = ("redline_review", "review", "git")
+ENGINE_SKILLS = ("redline_review", "onboard", "git")
 
 SEED_SQL = "\n".join(
     f"INSERT INTO skills (name, description, common, content, is_deleted) "
@@ -142,7 +142,7 @@ class RetireTest(unittest.TestCase):
         flipped = seed_skills.apply_retired(self.con)
         self.assertEqual(flipped, ["redline_review"])
         self.assertEqual(self._deleted("redline_review"), 1)
-        self.assertEqual(self._deleted("review"), 0)
+        self.assertEqual(self._deleted("onboard"), 0)
 
     def test_apply_is_idempotent(self):
         self._retire_file(["redline_review"])
@@ -223,13 +223,13 @@ class RetireTest(unittest.TestCase):
         self.reconcile_existing.assert_called_once_with(self.con)
 
     def test_cmd_grant_reconciles_the_target_shell(self):
-        skill_cli.cmd_grant(self.con, "review", ["BSP1"])
+        skill_cli.cmd_grant(self.con, "onboard", ["BSP1"])
         self.reconcile_targets.assert_called_once_with(self.con, [1])
 
     def test_cmd_revoke_reconciles_the_target_shell(self):
-        skill_cli.cmd_grant(self.con, "review", ["BSP1"])
+        skill_cli.cmd_grant(self.con, "onboard", ["BSP1"])
         self.reconcile_targets.reset_mock()
-        skill_cli.cmd_revoke(self.con, "review", ["BSP1"])
+        skill_cli.cmd_revoke(self.con, "onboard", ["BSP1"])
         self.reconcile_targets.assert_called_once_with(self.con, [1])
 
     def test_cmd_rm_reconciles_every_existing_checkout(self):
@@ -243,23 +243,23 @@ class RetireTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(
             SystemExit,
-            "grant review committed in the DB, snapshot, and flat render, "
+            "grant onboard committed in the DB, snapshot, and flat render, "
             "but skill projection failed: "
             "managed root is a symlink",
         ):
-            skill_cli.cmd_grant(self.con, "review", ["BSP1"])
+            skill_cli.cmd_grant(self.con, "onboard", ["BSP1"])
         self.assertEqual(
             self.con.execute(
                 "SELECT COUNT(*) FROM shell_skills ss "
                 "JOIN skills s ON s.skill_id=ss.skill_id "
-                "WHERE ss.shell_id=1 AND s.name='review'"
+                "WHERE ss.shell_id=1 AND s.name='onboard'"
             ).fetchone()[0],
             1,
         )
 
     def test_cmd_unretire_unlisted_is_loud(self):
         with self.assertRaises(SystemExit):
-            skill_cli.cmd_unretire(self.con, "review")
+            skill_cli.cmd_unretire(self.con, "onboard")
 
     # ── the Planner API lane shares the spec helpers ─────────────────────────
     def test_spec_helpers_raise_conflicts_instead_of_exiting(self):
@@ -268,7 +268,7 @@ class RetireTest(unittest.TestCase):
         with self.assertRaisesRegex(skill_cli.SkillConflictError, "no engine skill"):
             skill_cli._retire_spec(self.con, "no_such_skill")
         with self.assertRaisesRegex(skill_cli.SkillConflictError, "not on the retire list"):
-            skill_cli._unretire_spec(self.con, "review")
+            skill_cli._unretire_spec(self.con, "onboard")
 
     def test_api_retire_and_unretire_round_trip(self):
         status, body = server._skills_mutation_report(
@@ -303,7 +303,7 @@ class RetireTest(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertIn("LOCAL skill", body["error"])
         status, body = server._skills_mutation_report(
-            server.api_skill_unretire, self.con, "review")
+            server.api_skill_unretire, self.con, "onboard")
         self.assertEqual(status, 409)
         self.assertIn("not on the retire list", body["error"])
         with self.assertRaises(server.SkillApiError):
@@ -347,9 +347,9 @@ class RenderCheckRetirementTest(unittest.TestCase):
             with closing(sqlite3.connect(db)) as con:
                 rows = con.execute(
                     "SELECT name, is_deleted FROM skills "
-                    "WHERE name IN ('redline_review', 'review') ORDER BY name"
+                    "WHERE name IN ('redline_review', 'onboard') ORDER BY name"
                 ).fetchall()
-            self.assertEqual(rows, [("redline_review", 1), ("review", 0)])
+            self.assertEqual(rows, [("onboard", 0), ("redline_review", 1)])
 
 
 class SkillCliConnectionTest(unittest.TestCase):
@@ -385,7 +385,7 @@ class SkillCliConnectionTest(unittest.TestCase):
             mock.patch.object(skill_cli, "connect", return_value=con) as opened,
             mock.patch.object(skill_cli, "cmd_grant", return_value=0),
         ):
-            self.assertEqual(skill_cli.main(["grant", "review", "DEV1"]), 0)
+            self.assertEqual(skill_cli.main(["grant", "onboard", "DEV1"]), 0)
         opened.assert_called_once_with()
 
 

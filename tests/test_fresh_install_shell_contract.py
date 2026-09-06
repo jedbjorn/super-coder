@@ -36,9 +36,9 @@ class FreshInstallShellContractTest(unittest.TestCase):
         self.assertNotIn("./sc mem", dogfood)
 
     def test_cartographer_targets_canonical_local_map_state(self) -> None:
+        # F72: the cartographer procedure lives in its flavor body.
         skill = (
-            ROOT / ".super-coder" / "assets" / "skills" / "cartographer"
-            / "SKILL.md"
+            ROOT / ".super-coder" / "templates" / "shells" / "cartographer.md"
         ).read_text()
         self.assertIn("`.sc-state/local/map/config.json`", skill)
         self.assertIn("`.sc-state/map_extractors/<name>.py`", skill)

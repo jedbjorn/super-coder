@@ -154,7 +154,8 @@
     ".super-coder/migrations/0252_reseed_universal_pr_owner_wakes.sql",
     ".super-coder/migrations/0253_reseed_sprint_review_flexibility.sql",
     ".super-coder/migrations/0255_reseed_merge_gate_one_rule.sql",
-    ".super-coder/migrations/0256_current_state_500.sql"
+    ".super-coder/migrations/0256_current_state_500.sql",
+    ".super-coder/migrations/0257_guidance_reconciliation.sql"
   ],
   "baseline_migration_ledger": {
     "count": 142,
