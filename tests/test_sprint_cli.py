@@ -552,10 +552,10 @@ class SprintCliApiTest(unittest.TestCase):
         finally:
             con.close()
         self.assertEqual((1, "acme/outside", 85, None), subscription)
-        # The initial snapshot is durable, but a first green outside a Sprint
-        # is not actionable and wakes nobody (spec #188).
+        # The initial snapshot is durable and a first green outside a Sprint
+        # wakes the owner: the FnB merges on green (decision #327).
         self.assertEqual(["green"], transitions)
-        self.assertIsNone(message)
+        self.assertIsNotNone(message)
 
     def test_reconcile_pr_allows_originating_planner_and_projects_receipt(self):
         argv = (

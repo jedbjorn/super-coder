@@ -603,8 +603,8 @@ Sprint work explicitly); the mechanics live here for the operator.
   worktree's checked-out branch, `sc sprint register-pr` in a lane, or manual
   `sc pr subscribe`) emit self-describing red/green/closed/merged wakes to the
   owning Developer throughout ownership, inside or outside a Sprint; outside an
-  armed or paused Sprint, green arrives only as red-to-green recovery. Planner
-  and Reviewer receive no PR-event wakes.
+  armed or paused Sprint a green wake names the FnB merge directive as the
+  gate. Planner and Reviewer receive no PR-event wakes.
 - **Coordinate mode.** Closing the Planner chat during an armed Sprint sets
   coordinate mode: idle Planner `re-enter` wakes open fresh ticket chats.
   Pause/resume from the GUI returns to supervise mode; automatic pauses

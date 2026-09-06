@@ -124,8 +124,9 @@ reply is a new send with `Re: <topic>` in the body.
 
 A wake is a message delivered into your session at a turn boundary, into your
 idle chat, or as a new chat; read it and act on it. Accepting Sprint work is an
-explicit act (the `sprint_protocol` skill). PR events reach the Developer who
-owns the PR, inside or outside a Sprint, with the fact stated in the message.
+explicit act (the `sprint_protocol` skill). PR events (red, green, closed,
+merged) reach the Developer who owns the PR, inside or outside a Sprint, with
+the fact stated in the message.
 You never poll GitHub, boot participants, or schedule watchers.
 
 ---

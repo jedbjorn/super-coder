@@ -1466,7 +1466,8 @@ class SprintPRWatcher:
                     "needs attention, otherwise no action is needed."
                 ),
                 "green": (
-                    "Your PR is green outside an active Sprint; no action is needed."
+                    "Your PR is green outside an active Sprint; merge only under "
+                    "a standing FnB directive that names it, otherwise wait for one."
                 ),
                 "closed": (
                     "Your PR was closed without merge outside an active Sprint; "
@@ -1486,11 +1487,6 @@ class SprintPRWatcher:
                     "owns that reset; use its status/retry authority through the "
                     "originating Planner or FnB if needed."
                 )
-            # Outside an armed/paused Sprint green is only actionable as a
-            # red->green recovery; every other green would wake the owner to
-            # say "no action is needed".
-            if previous_state != "red":
-                instructions.pop("green")
         if state in instructions:
             head = pull_request.head_sha or "unknown"
             owner_shell_id = int(registered["owner_shell_id"])

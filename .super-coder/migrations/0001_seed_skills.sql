@@ -1286,8 +1286,8 @@ pending -> native wake; red -> fix/push; green -> judge/request review; none or
 untrustworthy watcher after one bounded read -> report + block. Follow
 context: armed -> fix red + judge/pass green + merged -> post-merge handoff;
 paused -> fix red now + judge green, review after resume; no active Sprint ->
-fix red if needed, green arrives only as red recovery, merged -> git skill
-after-merge cleanup. Planner/Reviewer get none.
+fix red if needed, green -> merge only on a standing FnB directive naming the
+PR, merged -> git skill after-merge cleanup. Planner/Reviewer get none.
 
 If the same registered PR was externally closed, then reopened, rebased, and
 pushed, replay the exact `register-pr` command. Require `created: false`, which

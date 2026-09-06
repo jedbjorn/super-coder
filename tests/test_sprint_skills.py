@@ -32,7 +32,12 @@ ROLE_SKILLS = {
     "sprint_rev": {"reviewer"},
 }
 SKILLS = {PROTOCOL: {"planner", "dev", "reviewer"}, **ROLE_SKILLS}
-RECONCILIATION = ENGINE / "migrations" / "0257_guidance_reconciliation.sql"
+# Every reseed since the guidance reconciliation, applied in order: the test
+# proves the trailing migrations converge on the current asset text.
+RECONCILIATION = (
+    ENGINE / "migrations" / "0257_guidance_reconciliation.sql",
+    ENGINE / "migrations" / "0258_reseed_non_sprint_green_wake.sql",
+)
 RETIRED = (
     "memory", "db_map", "bootstrap", "surface_catalogue", "messaging", "flags",
     "spec", "review", "docs", "admin_git", "cartographer", "sprint_close",
@@ -252,7 +257,7 @@ class SprintSkillTest(unittest.TestCase):
             con.execute("INSERT INTO shell_skills VALUES (7, ?)", (index,))
             con.execute("INSERT INTO flavor_skills VALUES ('dev', ?)", (index,))
         con.execute("UPDATE skills SET is_deleted=0, category='fork' WHERE name='fork_only'")
-        migration = RECONCILIATION.read_text()
+        migration = "\n".join(path.read_text() for path in RECONCILIATION)
         con.executescript(migration)
         first = con.execute(
             "SELECT name, description, category, command, common, content, is_deleted "

@@ -1363,8 +1363,9 @@ class RecoveryAndFailureTest(SprintPRWatcherCase):
         self.assertEqual(
             "GitHub PR event: repository=acme/repo, number=42, head_sha="
             + "a" * 40
-            + ", event=green. Your PR is green outside an active Sprint; "
-            "no action is needed.",
+            + ", event=green. Your PR is green outside an active Sprint; merge "
+            "only under a standing FnB directive that names it, otherwise wait "
+            "for one.",
             message["body"],
         )
 
@@ -1818,10 +1819,10 @@ class EngineWideSubscriptionTest(SprintPRWatcherCase):
 
         self.assertTrue(self.watcher.poll_once())
         self.assertEqual(calls + 2, len(self.reader.get_calls))
-        # Reopened green outside a Sprint is durable but not actionable: only
-        # the closed fact woke the owner.
+        # Reopened green outside a Sprint is actionable again: the FnB merges
+        # on green, so the owner hears the closed fact and then the green one.
         self.assertEqual(
-            ["closed"],
+            ["closed", "green"],
             [
                 re.search(r"event=([a-z_]+)", str(row[0])).group(1)
                 for row in self.con.execute(
@@ -2247,28 +2248,31 @@ class OwnerMergedAndGreenWakeTest(SprintPRWatcherCase):
             self._last_wake()["body"],
         )
 
-    def test_green_outside_sprint_wakes_only_as_red_recovery(self):
+    def test_green_outside_sprint_wakes_on_first_green_and_on_recovery(self):
         self.reader.current = pull_request(checks="PENDING", checks_failed=False)
         self.watcher.subscribe(owner_shell_id=1, repository="acme/repo", pr_number=42)
         self.assertEqual([], self._wake_events())
 
+        # Outside a Sprint the FnB merges on green, so the first green is the
+        # actionable fact — not only a red->green recovery.
         self.reader.current = pull_request(checks="SUCCESS", checks_failed=False)
         self.assertTrue(self.watcher.poll_once())
-        self.assertEqual([], self._wake_events())
-
-        self.reader.current = pull_request()
-        self.assertTrue(self.watcher.poll_once())
-        self.assertEqual(["red"], self._wake_events())
-
-        self.reader.current = pull_request(checks="SUCCESS", checks_failed=False)
-        self.assertTrue(self.watcher.poll_once())
-        self.assertEqual(["red", "green"], self._wake_events())
+        self.assertEqual(["green"], self._wake_events())
         self.assertIn(
-            "event=green. Your PR is green outside an active Sprint",
+            "event=green. Your PR is green outside an active Sprint; merge only "
+            "under a standing FnB directive that names it",
             self._last_wake()["body"],
         )
 
-        # Every observation is still durable even when nobody is woken.
+        self.reader.current = pull_request()
+        self.assertTrue(self.watcher.poll_once())
+        self.assertEqual(["green", "red"], self._wake_events())
+
+        self.reader.current = pull_request(checks="SUCCESS", checks_failed=False)
+        self.assertTrue(self.watcher.poll_once())
+        self.assertEqual(["green", "red", "green"], self._wake_events())
+
+        # Every observation is durable, pending included.
         self.assertEqual(
             ["pending", "green", "red", "green"],
             [
