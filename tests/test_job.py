@@ -208,6 +208,71 @@ class WaitTest(unittest.TestCase):
         self.assertEqual(1, job.cmd_wait(self._args(jd.name)))
 
 
+class KillIdentityTest(unittest.TestCase):
+    """`sc job kill` signals a recorded pid only while it is still the job's
+    own process incarnation (#954: a recycled pid must never be killpg'd)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.old_jobs = job.JOBS
+        job.JOBS = self.tmp
+
+    def tearDown(self):
+        job.JOBS = self.old_jobs
+
+    def _live_job(self, **meta_extra) -> Path:
+        # This test process stands in for the job's live child.
+        jd = start_job(self.tmp, ["sh", "-c", "sleep 60"])
+        meta = job.read_meta(jd)
+        meta.update(pid=os.getpid(), supervisor_pid=os.getpid(), **meta_extra)
+        job.write_meta(jd, meta)
+        return jd
+
+    def _refused_kill(self, jd) -> str:
+        with (
+            mock.patch.object(job, "_kill_group") as kill_group,
+            self.assertRaises(SystemExit) as caught,
+        ):
+            job.cmd_kill(SimpleNamespace(id=jd.name))
+        kill_group.assert_not_called()
+        self.assertFalse(job.read_meta(jd).get("killed"))
+        return str(caught.exception)
+
+    @unittest.skipUnless(job._has_procfs(), "needs procfs")
+    def test_supervisor_records_the_child_incarnation(self):
+        jd = start_job(self.tmp, ["sh", "-c", "exit 0"])
+        job.supervise(jd, notify=lambda m: True)
+        meta = job.read_meta(jd)
+        self.assertIsInstance(meta["start_ticks"], int)
+        self.assertIsInstance(meta["pid"], int)
+
+    @unittest.skipUnless(job._has_procfs(), "needs procfs")
+    def test_matching_incarnation_is_killed(self):
+        jd = self._live_job(start_ticks=job._start_ticks(os.getpid()))
+        with mock.patch.object(job, "_kill_group") as kill_group:
+            self.assertEqual(0, job.cmd_kill(SimpleNamespace(id=jd.name)))
+        kill_group.assert_called_once_with(os.getpid())
+        self.assertTrue(job.read_meta(jd).get("killed"))
+
+    @unittest.skipUnless(job._has_procfs(), "needs procfs")
+    def test_recycled_pid_is_never_signalled(self):
+        jd = self._live_job(start_ticks=job._start_ticks(os.getpid()) + 1)
+        self.assertIn("recycled", self._refused_kill(jd))
+
+    @unittest.skipUnless(job._has_procfs(), "needs procfs")
+    def test_unrecorded_identity_is_never_signalled(self):
+        jd = self._live_job()   # legacy meta: pid without start_ticks
+        self.assertIn("no recorded identity", self._refused_kill(jd))
+
+    @unittest.skipUnless(job._has_procfs(), "needs procfs")
+    def test_gone_pid_is_reported_not_signalled(self):
+        jd = self._live_job(start_ticks=1)
+        meta = job.read_meta(jd)
+        meta["pid"] = 2**22 + 1234567   # not a real pid
+        job.write_meta(jd, meta)
+        self.assertIn("gone", self._refused_kill(jd))
+
+
 class CompletionRowTest(unittest.TestCase):
     """send_completion against the real API server: the result row lands in
     the starting shell's own inbox, and the dedupe_key makes a resend a no-op."""
