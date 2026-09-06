@@ -261,6 +261,29 @@ class RetireTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             skill_cli.cmd_unretire(self.con, "onboard")
 
+    def test_cmd_unretire_removed_engine_skill_drops_stale_entry(self):
+        # Upstream removed `test_authoring`; the fork list still names it.
+        self._retire_file(["redline_review", "test_authoring"])
+        seed_skills.apply_retired(self.con)
+        with mock.patch("builtins.print") as printed:
+            self.assertEqual(
+                skill_cli.cmd_unretire(self.con, "test_authoring"), 0)
+        self.assertEqual(json.loads(seed_skills.RETIRED_FILE.read_text()),
+                         ["redline_review"])
+        self.assertEqual(self._deleted("redline_review"), 1)
+        self.assertIn("removed stale entry",
+                      printed.call_args_list[0].args[0])
+
+    def test_api_unretire_removed_engine_skill_reports_zero_grants(self):
+        self._retire_file(["test_authoring"])
+        status, body = server._skills_mutation_report(
+            server.api_skill_unretire, self.con, "test_authoring")
+        self.assertEqual((status, body), (200, {
+            "ok": True, "action": "unretire", "name": "test_authoring",
+            "grants": 0,
+        }))
+        self.assertEqual(json.loads(seed_skills.RETIRED_FILE.read_text()), [])
+
     # ── the Planner API lane shares the spec helpers ─────────────────────────
     def test_spec_helpers_raise_conflicts_instead_of_exiting(self):
         with self.assertRaisesRegex(skill_cli.SkillConflictError, "LOCAL skill"):
