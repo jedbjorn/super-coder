@@ -49,6 +49,18 @@ without putting it in argv or logs. Keep the lease for the whole push/exec/pull
 and reset sequence. A competing mutation fails rather than joining the active
 session. Report the test result and reset/release result separately.
 
+If `acquire` cannot save the token it hands the lease straight back and reports
+`lease_not_saved` with `lease_released`; fix the local state directory rather
+than retrying blindly. When a lease is held with its token lost anyway —
+`lease_released: false`, a killed process, a rebuilt checkout — clear it:
+
+```bash
+sc vm test release --force
+```
+
+The flag is the confirmation that no session is running, exactly as with
+`stop --force`; it names the owner it displaced. Never wait out the lease TTL.
+
 Guest paths are relative to the configured workspace. `exec` always requires
 an explicit `--cwd` there and runs PowerShell under the configured
 administrator account. Prefer `--command-file` for non-trivial scripts. A
@@ -162,11 +174,32 @@ Fish syntax:
 restrict,command="/home/jedi/Repos/subfloor/sc vm test serve" ssh-ed25519 <public-key> windows-test-controller
 ```
 
-Keep the private key on Dev and point an SSH alias such as
-`halo-windows-test` at it with `RequestTTY no`. Do not reuse an unrestricted
-Halo login key. Verify both init modes with the same small
-status/acquire/start/push/exec/pull/reset/release run, then confirm lease
-conflicts, protected snapshot refusal, and failed-promotion preservation.
+Keep the private key on Dev and put the alias in the dedicated client seam —
+`~/.config/subfloor/windows-test-client/`, mode `0700`, holding only the
+restricted key (`0600`), the single alias, and the pinned Halo host key:
+
+```text
+# ~/.config/subfloor/windows-test-client/config
+Host halo-windows-test
+    HostName <Halo address>
+    User jedi
+    RequestTTY no
+    IdentitiesOnly yes
+    IdentityFile ~/.config/subfloor/windows-test-client/sc_win_test
+    UserKnownHostsFile ~/.config/subfloor/windows-test-client/known_hosts
+    StrictHostKeyChecking yes
+```
+
+`sc vm test` passes this file to `ssh -F`, so the transport does not depend on
+the caller's own `~/.ssh` — which a sandbox shell does not have, and which
+OpenSSH would resolve from the container's uid rather than `$HOME` anyway.
+`sc launch` bind-mounts the directory read-only at the same path when it
+exists, so sandboxed shells get the same transport and it survives a rebuild;
+the operator's general `~/.ssh` is never mounted. `sc vm test init ssh <alias>`
+reports the selected `ssh_config` (`null` = no seam, per-user config in use).
+Do not reuse an unrestricted Halo login key. Verify both init modes with the
+same small status/acquire/start/push/exec/pull/reset/release run, then confirm
+lease conflicts, protected snapshot refusal, and failed-promotion preservation.
 
 After the reviewed engine revision is installed in active dos-arch, import this
 file as a fork-local skill. Every `sc skill` mutation is Planner-owned: the

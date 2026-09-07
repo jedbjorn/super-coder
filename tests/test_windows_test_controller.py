@@ -206,7 +206,11 @@ def test_lease_rejects_competing_session_and_mutation(subject):
         controller.start("wrong-token", None)
     assert caught.value.code == "lease_conflict"
 
-    assert controller.release(token) == {"released": True}
+    assert controller.release(token) == {
+        "released": True,
+        "forced": False,
+        "owner": "first",
+    }
 
 
 def test_start_waits_for_administrator_powershell_readiness(subject):
@@ -436,7 +440,17 @@ def test_exec_nonzero_is_a_structured_operation_failure(subject, monkeypatch):
     assert response["result"]["exit_code"] == 7
 
 
-def test_transport_initialization_changes_only_process_transport(monkeypatch):
+def _install_client_seam(tmp_path, monkeypatch, *, mode=0o700):
+    seam = tmp_path / "windows-test-client"
+    seam.mkdir(mode=mode)
+    config = seam / "config"
+    config.write_text("Host halo-windows-test\n", encoding="utf-8")
+    monkeypatch.setattr(controller_mod, "CLIENT_SSH_DIR", seam)
+    monkeypatch.setattr(controller_mod, "CLIENT_SSH_CONFIG", config)
+    return seam, config
+
+
+def test_transport_initialization_changes_only_process_transport(tmp_path, monkeypatch):
     calls = []
 
     def fake_popen(argv, **kwargs):
@@ -444,6 +458,7 @@ def test_transport_initialization_changes_only_process_transport(monkeypatch):
         return FakeProcess()
 
     monkeypatch.setattr(controller_mod.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(controller_mod, "CLIENT_SSH_CONFIG", tmp_path / "absent")
 
     controller_mod._client_process({"transport": "local"})
     controller_mod._client_process({"transport": "ssh", "host": "halo-windows-test"})
@@ -463,6 +478,54 @@ def test_transport_initialization_changes_only_process_transport(monkeypatch):
         "halo-windows-test",
     ]
     assert calls[0][1] == calls[1][1]
+
+
+def test_ssh_transport_uses_the_restricted_client_seam(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_popen(argv, **kwargs):
+        calls.append(argv)
+        return FakeProcess()
+
+    monkeypatch.setattr(controller_mod.subprocess, "Popen", fake_popen)
+    _seam, config = _install_client_seam(tmp_path, monkeypatch)
+
+    controller_mod._client_process({"transport": "ssh", "host": "halo-windows-test"})
+
+    assert calls[0][:4] == ["ssh", "-T", "-F", str(config)]
+    assert calls[0][-1] == "halo-windows-test"
+
+
+def test_ssh_transport_refuses_a_readable_client_seam(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        controller_mod.subprocess, "Popen", lambda *a, **k: FakeProcess()
+    )
+    _install_client_seam(tmp_path, monkeypatch, mode=0o755)
+
+    with pytest.raises(controller_mod.ControllerError) as caught:
+        controller_mod._client_process(
+            {"transport": "ssh", "host": "halo-windows-test"}
+        )
+
+    assert caught.value.code == "configuration_permissions"
+
+
+def test_init_ssh_reports_the_selected_client_seam(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    _seam, config = _install_client_seam(tmp_path, monkeypatch)
+
+    assert controller_mod.client_main(["init", "ssh", "halo-windows-test"]) == 0
+    reported = json.loads(capsys.readouterr().out)
+
+    assert reported["result"] == {
+        "transport": "ssh",
+        "host": "halo-windows-test",
+        "ssh_config": str(config),
+    }
+
+    monkeypatch.setattr(controller_mod, "CLIENT_SSH_CONFIG", tmp_path / "absent")
+    assert controller_mod.client_main(["init", "ssh", "halo-windows-test"]) == 0
+    assert json.loads(capsys.readouterr().out)["result"]["ssh_config"] is None
 
 
 def test_client_uses_same_frame_and_saves_lease_outside_argv(tmp_path, monkeypatch):
@@ -500,6 +563,60 @@ def test_client_uses_same_frame_and_saves_lease_outside_argv(tmp_path, monkeypat
     saved = json.loads(client_path.read_text())
     assert saved["lease"] == "opaque-token"
     assert client_path.stat().st_mode & 0o077 == 0
+
+
+def test_forced_release_recovers_a_lease_whose_token_is_lost(subject):
+    controller, _runner, _popen, _clock = subject
+    acquire(subject, "stranded-owner")
+
+    assert controller.release(None, force=True) == {
+        "released": True,
+        "forced": True,
+        "owner": "stranded-owner",
+    }
+    assert controller.status()["lease"]["active"] is False
+    # Idempotent: a second force has nothing to displace and still succeeds.
+    assert controller.release(None, force=True)["owner"] is None
+    controller.acquire("next-owner")
+
+
+def test_unsavable_lease_is_handed_back_instead_of_stranded(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    client_path = tmp_path / ".sc-state/local/windows-test-client.json"
+    controller_mod._atomic_json(client_path, {"transport": "local"})
+    acquired = controller_mod._success(
+        "acquire",
+        {"token": "opaque-token", "owner": "dev", "acquired_at": 1, "expires_at": 2},
+    )
+    released = controller_mod._success(
+        "release", {"released": True, "forced": False, "owner": "dev"}
+    )
+    sent = []
+
+    def fake_client_process(_cfg):
+        body = acquired if not sent else released
+        return FakeProcess(
+            response=json.dumps(body, separators=(",", ":")).encode() + b"\n"
+        )
+
+    def refuse_write(path, _payload):
+        if path == client_path:
+            raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(controller_mod, "_client_process", fake_client_process)
+    monkeypatch.setattr(
+        controller_mod,
+        "_write_header",
+        lambda stream, request: sent.append(request),
+    )
+    monkeypatch.setattr(controller_mod, "_atomic_json", refuse_write)
+
+    with pytest.raises(controller_mod.ControllerError) as caught:
+        controller_mod.client_request({"operation": "acquire", "owner": "dev"})
+
+    assert caught.value.code == "lease_not_saved"
+    assert caught.value.details == {"lease_released": True}
+    assert sent[1] == {"operation": "release", "lease": "opaque-token"}
 
 
 def test_failed_pull_transport_does_not_replace_existing_result(tmp_path, monkeypatch):
@@ -547,6 +664,16 @@ def test_client_preserves_child_error_when_response_frame_is_missing(
         "exit_code": 1,
         "stderr": "TypeError: null exit code\n",
     }
+
+
+def test_launch_mounts_only_the_restricted_client_seam():
+    dispatch = (ENGINE / "scripts/dispatch.sh").read_text(encoding="utf-8")
+    seam = '$HOME/.config/subfloor/windows-test-client'
+    assert f'wintest_dir="{seam}"' in dispatch
+    assert '[ -d "$wintest_dir" ] && wintest_mount=' in dispatch
+    assert '"-v $wintest_dir:$wintest_dir:ro"' in dispatch
+    assert "        $wintest_mount \\\n" in dispatch
+    assert "$HOME/.ssh" not in dispatch
 
 
 def test_fork_local_skill_template_is_ready_for_supported_import():
