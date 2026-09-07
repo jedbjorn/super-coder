@@ -1873,6 +1873,8 @@ Subfloor — forkable shell substrate — full command reference (./sc help for 
                            select Halo-local or Dev-through-ForceCommand transport
   ./sc vm test status|acquire|release|start|stop|exec|push|pull|snapshot|reset|baseline
                            drive the fixed W10C-Testing controller; run --help for exact forms
+  ./sc vm test release --force
+                           clear a lease whose token was lost, so no seat waits out the TTL
   ./sc vm-broker           run the broker in the foreground (unix socket)
   ./sc vm-bake             HOST-side: graceful shutdown + (re)bake the clean snapshot after provisioning
                              (deliberately NOT a broker verb — the sandbox must never redefine 'clean')

@@ -206,7 +206,11 @@ def test_lease_rejects_competing_session_and_mutation(subject):
         controller.start("wrong-token", None)
     assert caught.value.code == "lease_conflict"
 
-    assert controller.release(token) == {"released": True}
+    assert controller.release(token) == {
+        "released": True,
+        "forced": False,
+        "owner": "first",
+    }
 
 
 def test_start_waits_for_administrator_powershell_readiness(subject):
@@ -559,6 +563,60 @@ def test_client_uses_same_frame_and_saves_lease_outside_argv(tmp_path, monkeypat
     saved = json.loads(client_path.read_text())
     assert saved["lease"] == "opaque-token"
     assert client_path.stat().st_mode & 0o077 == 0
+
+
+def test_forced_release_recovers_a_lease_whose_token_is_lost(subject):
+    controller, _runner, _popen, _clock = subject
+    acquire(subject, "stranded-owner")
+
+    assert controller.release(None, force=True) == {
+        "released": True,
+        "forced": True,
+        "owner": "stranded-owner",
+    }
+    assert controller.status()["lease"]["active"] is False
+    # Idempotent: a second force has nothing to displace and still succeeds.
+    assert controller.release(None, force=True)["owner"] is None
+    controller.acquire("next-owner")
+
+
+def test_unsavable_lease_is_handed_back_instead_of_stranded(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    client_path = tmp_path / ".sc-state/local/windows-test-client.json"
+    controller_mod._atomic_json(client_path, {"transport": "local"})
+    acquired = controller_mod._success(
+        "acquire",
+        {"token": "opaque-token", "owner": "dev", "acquired_at": 1, "expires_at": 2},
+    )
+    released = controller_mod._success(
+        "release", {"released": True, "forced": False, "owner": "dev"}
+    )
+    sent = []
+
+    def fake_client_process(_cfg):
+        body = acquired if not sent else released
+        return FakeProcess(
+            response=json.dumps(body, separators=(",", ":")).encode() + b"\n"
+        )
+
+    def refuse_write(path, _payload):
+        if path == client_path:
+            raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(controller_mod, "_client_process", fake_client_process)
+    monkeypatch.setattr(
+        controller_mod,
+        "_write_header",
+        lambda stream, request: sent.append(request),
+    )
+    monkeypatch.setattr(controller_mod, "_atomic_json", refuse_write)
+
+    with pytest.raises(controller_mod.ControllerError) as caught:
+        controller_mod.client_request({"operation": "acquire", "owner": "dev"})
+
+    assert caught.value.code == "lease_not_saved"
+    assert caught.value.details == {"lease_released": True}
+    assert sent[1] == {"operation": "release", "lease": "opaque-token"}
 
 
 def test_failed_pull_transport_does_not_replace_existing_result(tmp_path, monkeypatch):

@@ -475,12 +475,15 @@ while ($cursor -and $cursor.Length -ge $root.Length) {{
 {body}
 """
 
-    def _lease(self, state: dict, token: object) -> dict:
+    def _active_lease(self, state: dict) -> dict | None:
         lease = state.get("lease")
-        if (
-            not isinstance(lease, dict)
-            or float(lease.get("expires_at", 0)) <= self.now()
-        ):
+        if not isinstance(lease, dict):
+            return None
+        return lease if float(lease.get("expires_at", 0)) > self.now() else None
+
+    def _lease(self, state: dict, token: object) -> dict:
+        lease = self._active_lease(state)
+        if lease is None:
             raise ControllerError(
                 "lease_required", "an active controller lease is required"
             )
@@ -538,15 +541,7 @@ while ($cursor -and $cursor.Length -ge $root.Length) {{
     def status(self) -> dict:
         self._verify_target()
         state = self._state()
-        lease = state.get("lease")
-        active_lease = (
-            lease
-            if (
-                isinstance(lease, dict)
-                and float(lease.get("expires_at", 0)) > self.now()
-            )
-            else None
-        )
+        active_lease = self._active_lease(state)
         snapshots = self._snapshot_list()
         domain_state = self._domain_state()
         guest: dict[str, object] = {
@@ -585,11 +580,8 @@ while ($cursor -and $cursor.Length -ge $root.Length) {{
             )
         with self._locked():
             state = self._state()
-            current = state.get("lease")
-            if (
-                isinstance(current, dict)
-                and float(current.get("expires_at", 0)) > self.now()
-            ):
+            current = self._active_lease(state)
+            if current is not None:
                 raise ControllerError(
                     "lease_conflict",
                     "the controller is already leased",
@@ -610,13 +602,19 @@ while ($cursor -and $cursor.Length -ge $root.Length) {{
             self._save_state(state)
             return dict(lease)
 
-    def release(self, token: object) -> dict:
+    def release(self, token: object, force: object = False) -> dict:
+        """Hand the lease back.  ``force`` clears it without presenting the
+        token — the operator asserting no session is running, the way
+        ``stop --force`` asserts the guest may be cut.  It is the only recovery
+        when a token is lost with the lease still held, and without it such a
+        loss locks every seat out for the whole TTL."""
         with self._locked():
             state = self._state()
-            self._lease(state, token)
+            lease = self._active_lease(state) if force else self._lease(state, token)
+            owner = lease.get("owner") if lease else None
             state["lease"] = None
             self._save_state(state)
-            return {"released": True}
+            return {"released": True, "forced": bool(force), "owner": owner}
 
     def start(self, token: object, timeout: object) -> dict:
         wait = _validated_timeout(timeout, 120)
@@ -1015,7 +1013,7 @@ if ((Get-Item -LiteralPath $target).Length -ne {size}) {{ throw 'uploaded file s
         if operation == "acquire":
             return _success(operation, self.acquire(request.get("owner")))
         if operation == "release":
-            return _success(operation, self.release(token))
+            return _success(operation, self.release(token, request.get("force")))
         if operation == "start":
             return _success(operation, self.start(token, request.get("timeout")))
         if operation == "stop":
@@ -1169,6 +1167,18 @@ def _client_process(cfg: dict) -> subprocess.Popen:
     )
 
 
+def _hand_back(token: str) -> bool:
+    """Release a lease whose token could not be persisted.  Best effort — the
+    transport may itself be what failed — and `release --force` is the recovery
+    when even this does not land."""
+    try:
+        return bool(
+            client_request({"operation": "release", "lease": token}).get("ok")
+        )
+    except (ControllerError, OSError):
+        return False
+
+
 def client_request(
     request: dict, *, input_path: Path | None = None, output_path: Path | None = None
 ) -> dict:
@@ -1239,12 +1249,28 @@ def client_request(
         if tmp is not None:
             tmp.unlink(missing_ok=True)
     if response.get("ok") and request["operation"] == "acquire":
-        cfg["lease"] = response["result"]["token"]
-        _atomic_json(_client_config_path(), cfg)
+        token = response["result"]["token"]
+        cfg["lease"] = token
+        try:
+            _atomic_json(_client_config_path(), cfg)
+        except OSError as exc:
+            # The controller already holds the lease and this token is the only
+            # copy of it.  Hand it straight back rather than stranding the
+            # controller under an owner whose token exists nowhere.
+            raise ControllerError(
+                "lease_not_saved",
+                "the controller lease could not be saved locally",
+                {"lease_released": _hand_back(token)},
+            ) from exc
         response["result"].pop("token", None)
         response["result"]["lease_saved"] = True
-    if response.get("ok") and request["operation"] == "release":
-        cfg.pop("lease", None)
+    # Only rewrite when a token was actually dropped — a forced release from a
+    # seat that never held one must not fail on the write that stranded it.
+    if (
+        response.get("ok")
+        and request["operation"] == "release"
+        and cfg.pop("lease", None) is not None
+    ):
         _atomic_json(_client_config_path(), cfg)
     return response
 
@@ -1266,7 +1292,13 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("status")
     acquire = commands.add_parser("acquire")
     acquire.add_argument("--owner", default="shell")
-    commands.add_parser("release")
+    release = commands.add_parser("release")
+    release.add_argument(
+        "--force",
+        action="store_true",
+        help="clear the active lease without its token; the flag is the "
+        "confirmation that no session is running",
+    )
     for verb in ("start", "stop"):
         item = commands.add_parser(verb)
         item.add_argument("--timeout", type=int)
@@ -1325,6 +1357,8 @@ def client_main(argv: list[str]) -> int:
         input_path = output_path = None
         if args.operation == "acquire":
             request["owner"] = args.owner
+        elif args.operation == "release":
+            request["force"] = args.force
         elif args.operation in ("start", "stop"):
             request["timeout"] = args.timeout
             if args.operation == "stop":

@@ -49,6 +49,18 @@ without putting it in argv or logs. Keep the lease for the whole push/exec/pull
 and reset sequence. A competing mutation fails rather than joining the active
 session. Report the test result and reset/release result separately.
 
+If `acquire` cannot save the token it hands the lease straight back and reports
+`lease_not_saved` with `lease_released`; fix the local state directory rather
+than retrying blindly. When a lease is held with its token lost anyway —
+`lease_released: false`, a killed process, a rebuilt checkout — clear it:
+
+```bash
+sc vm test release --force
+```
+
+The flag is the confirmation that no session is running, exactly as with
+`stop --force`; it names the owner it displaced. Never wait out the lease TTL.
+
 Guest paths are relative to the configured workspace. `exec` always requires
 an explicit `--cwd` there and runs PowerShell under the configured
 administrator account. Prefer `--command-file` for non-trivial scripts. A
