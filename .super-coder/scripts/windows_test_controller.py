@@ -35,6 +35,13 @@ DOMAIN = "W10C-Testing"
 DOMAIN_UUID = "0b314d1a-bd03-47b9-8155-01a6d470f7a9"
 CONFIG_PATH = Path.home() / ".config" / "subfloor" / "windows-test-controller.json"
 CLIENT_PATH = Path(".sc-state/local/windows-test-client.json")
+# The restricted SSH client seam: the dedicated ForceCommand key, the single
+# controller alias, and the pinned Halo host key.  `sc launch` bind-mounts this
+# directory read-only at the same path, so a sandbox shell reaches the
+# controller without the operator's general ~/.ssh — which OpenSSH would not
+# read there anyway, resolving `~` from the container uid rather than $HOME.
+CLIENT_SSH_DIR = Path.home() / ".config" / "subfloor" / "windows-test-client"
+CLIENT_SSH_CONFIG = CLIENT_SSH_DIR / "config"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SSH_ALIAS_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 MAX_HEADER_BYTES = 64 * 1024
@@ -1122,6 +1129,15 @@ def _load_client() -> dict:
     return _read_json(_client_config_path(), "Windows test client configuration")
 
 
+def _client_ssh_config_argv() -> list[str]:
+    """Select the seam config when it is installed, otherwise the caller's own
+    per-user SSH configuration."""
+    if not CLIENT_SSH_CONFIG.exists():
+        return []
+    _require_owner_directory(CLIENT_SSH_DIR, "Windows test SSH client directory")
+    return ["-F", str(CLIENT_SSH_CONFIG)]
+
+
 def _client_process(cfg: dict) -> subprocess.Popen:
     transport = cfg.get("transport")
     if transport == "local":
@@ -1132,9 +1148,8 @@ def _client_process(cfg: dict) -> subprocess.Popen:
             raise ControllerError(
                 "client_configuration_invalid", "SSH controller alias is invalid"
             )
-        argv = [
-            "ssh",
-            "-T",
+        argv = ["ssh", "-T", *_client_ssh_config_argv()]
+        argv += [
             "-o",
             "BatchMode=yes",
             "-o",
@@ -1296,8 +1311,14 @@ def client_main(argv: list[str]) -> int:
                 )
             cfg["host"] = args.host
         _atomic_json(_client_config_path(), cfg)
+        seam = CLIENT_SSH_CONFIG if args.transport == "ssh" else None
         response = _success(
-            "init", {"transport": args.transport, "host": cfg.get("host")}
+            "init",
+            {
+                "transport": args.transport,
+                "host": cfg.get("host"),
+                "ssh_config": str(seam) if seam and seam.exists() else None,
+            },
         )
     else:
         request: dict = {"operation": args.operation}

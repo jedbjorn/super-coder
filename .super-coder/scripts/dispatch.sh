@@ -1413,6 +1413,18 @@ case "$cmd" in
           fi ;;
       esac
     fi
+    # Windows-test SSH client seam. A sandbox shell holding `windows_testing`
+    # reaches the fixed Halo controller with `ssh <alias>`, but the sandbox has
+    # no per-user SSH material — and OpenSSH resolves `~` from the container
+    # process's uid (root), not $HOME, so a home-directory mount would not be
+    # read either. Bind ONLY the dedicated controller directory — restricted
+    # key, single alias, pinned host key — read-only at the same path; `sc vm
+    # test` points ssh at it with -F. The operator's general ~/.ssh is never
+    # mounted. Absent directory = no seam and no mount; the host path keeps
+    # using its own per-user config.
+    wintest_mount=""
+    wintest_dir="$HOME/.config/subfloor/windows-test-client"
+    [ -d "$wintest_dir" ] && wintest_mount="-v $wintest_dir:$wintest_dir:ro"
     # Docker's init shim is PID 1 so orphaned harness/worker subprocesses are
     # reaped. Without it the Python API server becomes PID 1, never wait()s on
     # reparented children, and long-running multi-shell work exhausts the
@@ -1438,6 +1450,7 @@ case "$cmd" in
         $state_namespace_mounts \
         $state_mount \
         $py_mount \
+        $wintest_mount \
         -v "$HOME/.claude:$HOME/.claude" \
         -v "$HOME/.claude.json:$HOME/.claude.json" \
         -v "$HOME/.config/opencode:$HOME/.config/opencode" \
