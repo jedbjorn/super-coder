@@ -98,6 +98,40 @@ the .NET 8 SDK, package restore access, and a writable workspace such as
 Create the immutable recovery snapshot and initial offline working snapshot as
 an operator.
 
+### Disposable guest execution policy
+
+The controller uploads a generated PowerShell script and invokes it with
+`powershell.exe -File`. A stock `Restricted` execution policy rejects that
+script before the test command starts. For a deliberately disposable test
+image, open **Windows PowerShell as Administrator** and configure the image:
+
+```powershell
+Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Bypass -Force
+Get-ExecutionPolicy -List
+Get-ExecutionPolicy
+```
+
+Pass = the effective policy printed by the final command is `Bypass`. A
+`MachinePolicy` or `UserPolicy` imposed by Group Policy can override the local
+setting; do not promote the baseline until the effective-policy check and an
+actual controller `exec` both pass.
+
+> **Disposable-image boundary:** machine-wide `Bypass` removes PowerShell's
+> script-signing, warning, and prompt guardrails for every account in this
+> guest. The controller's SSH identity is also a local Administrator and can
+> execute arbitrary privileged code in the guest. Use this posture only for a
+> throwaway VM that contains no personal/work data, reusable credentials,
+> authenticated browser sessions, host shares, or other secrets. Do not apply
+> it to canonical `W10C`, a daily-use VM, or any persistent machine. Snapshot
+> reset removes changes made after the snapshot; it does not protect data while
+> the VM is running or remove a secret already baked into a baseline.
+
+After installing the toolchain and setting the policy, run a small
+push/exec/pull test, compare the source and pulled artifact hashes, promote a
+new working baseline, then reset/start/exec once from that baseline. Preserve
+the immutable recovery snapshot and the previous working snapshot. Finish
+powered off with no active lease.
+
 On Halo, create `~/.config/subfloor/windows-test-controller.json` for `jedi`
 with mode `0600` and its parent directory mode `0700`:
 

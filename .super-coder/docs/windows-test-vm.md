@@ -85,6 +85,34 @@ User: SSH foothold :::class4 -> Admin: install kit :::class1 -> Snapshot = clean
 
 The manifest (a `winget` export — WiX, .NET SDK, MSBuild for dos-arch) is committed in the fork at a known path and rides snapshot/render. `configure_winbox` supplies the *mechanism* (ssh in, `winget import`, verify); the fork supplies the *package list* — so the skill stays generic across forks.
 
+### Disposable Windows security posture
+
+The current fixed controller uploads a generated PowerShell script and runs it
+with `powershell.exe -File`. If the guest's effective execution policy is
+`Restricted`, the command is rejected before the requested test starts. On a
+purpose-built disposable image, the operator may set the machine-wide policy
+from an elevated Windows PowerShell prompt:
+
+```powershell
+Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Bypass -Force
+Get-ExecutionPolicy -List
+Get-ExecutionPolicy
+```
+
+The final command must report effective policy `Bypass`; Group Policy at
+`MachinePolicy` or `UserPolicy` can override `LocalMachine`. Verify with a real
+controller push/exec/pull round trip and repeat exec after restoring the newly
+promoted working baseline.
+
+This is an explicit **disposable-image-only** tradeoff. `Bypass` removes
+PowerShell's script-signing, warning, and prompt guardrails machine-wide, and
+the controller account already has local Administrator authority. Never apply
+this configuration to a daily-use, canonical, or otherwise persistent Windows
+VM. The test image must contain no personal/work data, reusable credentials,
+authenticated browser sessions, host shares, or other secrets. Frequent reset
+limits persistence after the snapshot; it does not limit exposure while the VM
+is running and cannot remove secrets captured in a baseline.
+
 ## Config
 
 Lives in the existing fork-level `instance.json` (where the port is already persisted) under a `vm` key. **No schema migration, no `connections` un-retire, no `SHELL_EDITABLE` plumbing.**
